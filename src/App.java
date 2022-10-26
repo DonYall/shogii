@@ -68,7 +68,15 @@ public class App extends JFrame {
         Image boardImage = (bufferedBoard.getScaledInstance(pieceSize*9, pieceSize*9, BufferedImage.SCALE_SMOOTH));
 
         // Piece images
-        
+        BufferedImage bufferedPieces = ImageIO.read(getClass().getResource("pieces.png"));
+        Map<String, Image> pieceImages = new HashMap<>();
+        pieceImages.put("truegold", bufferedBoard.getSubimage(0, 0, 100, 100));
+        pieceImages.put("falsegold", bufferedBoard.getSubimage(0, 100, 100, 100));
+        pieceImages.put("truesilver", bufferedBoard.getSubimage(0, 0, 100, 100));
+        pieceImages.put("truegold", bufferedBoard.getSubimage(0, 0, 100, 100));
+        pieceImages.put("truegold", bufferedBoard.getSubimage(0, 0, 100, 100));
+        pieceImages.put("truegold", bufferedBoard.getSubimage(0, 0, 100, 100));
+        pieceImages.put("truegold", bufferedBoard.getSubimage(0, 0, 100, 100));
 
         // Drawing the game panel and starting position
         gamePanel = new JPanel() {
