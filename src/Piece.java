@@ -5,12 +5,16 @@ public class Piece {
     boolean isSente;
     boolean isDed;
     int xPos, yPos;
+    int x, y;
+    int pieceSize = 64;
 
     public Piece(String type, boolean isSente, int yPos, int xPos) {
         this.type = type;
         this.isSente = isSente;
         this.xPos = xPos;
         this.yPos = yPos;
+        x = xPos*pieceSize;
+        y = yPos*pieceSize;
         updateValue();
     }
 
@@ -24,7 +28,10 @@ public class Piece {
     }
 
     public void move(int xPos, int yPos) {
-
+        this.xPos = xPos;
+        this.yPos = yPos;
+        x = xPos*pieceSize;
+        y = yPos*pieceSize;
     }
 
     public void updateValue() {
