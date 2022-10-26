@@ -4,16 +4,30 @@ public class Piece {
     boolean isPromoted;
     boolean isSente;
     boolean isDed;
+    int xPos, yPos;
 
-    public Piece(String type, boolean isSente, boolean isPromoted) {
+    public Piece(String type, boolean isSente, int yPos, int xPos) {
         this.type = type;
         this.isSente = isSente;
-        this.isPromoted = isPromoted;
-        updateMaterial();
+        this.xPos = xPos;
+        this.yPos = yPos;
+        updateValue();
+    }
+
+    public void promote() {
+        isPromoted = true;
+    }
+
+    public void kill() {
+        isDed = true;
+        isSente = !this.isSente;
+    }
+
+    public void move(int xPos, int yPos) {
 
     }
 
-    public void updateMaterial() {
+    public void updateValue() {
         if (isPromoted) {
             if (type.equals("pawn")) {
                 value = 1;
