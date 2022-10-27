@@ -13,8 +13,7 @@ public class Piece {
         this.isSente = isSente;
         this.xPos = xPos;
         this.yPos = yPos;
-        x = xPos*pieceSize;
-        y = yPos*pieceSize;
+        updatePos();
         updateValue();
     }
 
@@ -24,15 +23,23 @@ public class Piece {
 
     public void kill() {
         isDed = true;
-        isSente = !this.isSente;
+        isSente = !isSente;
+        // xPos = -1;
+        // yPos = -1;
+        // updatePos();
     }
 
-    public void move(int xPos, int yPos) {
+    public boolean move(int xPos, int yPos) {
+        if (isDed && xPos < 9) {
+            isDed = false;
+        }
         this.xPos = xPos;
         this.yPos = yPos;
-        x = xPos*pieceSize;
-        y = yPos*pieceSize;
+        x = xPos * pieceSize;
+        y = yPos * pieceSize;
+        return true;
     }
+
 
     public void updateValue() {
         if (isPromoted) {
@@ -97,6 +104,10 @@ public class Piece {
                 }
             }
         }
+    }
+    public void updatePos() {
+        x = xPos * pieceSize;
+        y = yPos * pieceSize;
     }
 
 }
