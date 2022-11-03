@@ -44,6 +44,13 @@ public class Piece {
         return true;
     }
 
+    public void fakeMove(int xPos, int yPos) {
+        if (isDed && xPos < 9) {
+            isDed = false;
+        }
+        this.xPos = xPos;
+        this.yPos = yPos;    
+    }
 
     public void updateValue() {
         if (isPromoted) {

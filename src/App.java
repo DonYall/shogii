@@ -315,7 +315,7 @@ public class App extends JFrame {
 
     public Piece getPiece(int x, int y) {
         for (int i = 0; i < pieces.length; i++) {
-            if (pieces[i].xPos == x && pieces[i].yPos == y) {
+            if (inBounds(new int[] {pieces[i].xPos, pieces[i].yPos}) && pieces[i].xPos == x && pieces[i].yPos == y) {
                 return pieces[i];
             }
         }
@@ -622,6 +622,7 @@ public class App extends JFrame {
     public ArrayList<int[]> getAvailableSquares(Piece p) {
         ArrayList<int[]> squares = new ArrayList<int[]>();
         if (p.isDed) {
+            // Piece dropping mechanics
             int yStart = 0;
             int yLimit = 9;
             if (p.type.equals("pawn") || p.type.equals("lance")) {
@@ -657,6 +658,29 @@ public class App extends JFrame {
                 }
             }
         }
+
+        // Check if move leaves you in check
+        int[] origin = {p.xPos, p.yPos};
+        for (int i = 0; i < squares.size(); i++) {
+            int[] move = squares.get(i);
+            Piece killedPiece = getPiece(move[0], move[1]);
+            boolean killedPromoted = false;
+            p.fakeMove(move[0], move[1]);
+            if (killedPiece != null) {
+                killedPromoted = killedPiece.isPromoted;
+                killedPiece.fakeMove(-3, -3);
+            }
+            if (isChecked(p.isSente)) {
+                squares.remove(move);
+            }
+            p.fakeMove(origin[0], origin[1]);
+            if (killedPiece != null) {
+                killedPiece.fakeMove(move[0], move[1]);
+                killedPiece.isPromoted = killedPromoted;
+            }
+        }
+
+        squares.trimToSize();
         return squares;
     }
 
@@ -728,10 +752,200 @@ public class App extends JFrame {
         }
     }
 
-    public boolean isChecked() {
-        return true;
-    }
+    public boolean isChecked(boolean sente) {
+        int yMod;
+        if (sente) yMod = -1;
+        else yMod = 1;
+        // Find the king on the board
+        Piece p;
+        if (sente) p = pieces[38];
+        else p = pieces[39];
+        // If the king is checked by a lance
+        if (getPiece(p.xPos+1, p.yPos) != null) {
+            if (getPiece(p.xPos+1, p.yPos).type.equalsIgnoreCase("lance") && getPiece(p.xPos+1, p.yPos).isSente != sente) return true;
+        } else if (getPiece(p.xPos-1, p.yPos) != null) {
+            if (getPiece(p.xPos-1, p.yPos).type.equalsIgnoreCase("lance") && getPiece(p.xPos-1, p.yPos).isSente != sente) return true;
+        }
 
+        int x = p.xPos;
+        int y = p.yPos + yMod;
+        while (y < 9 && y >= 0) {
+            if (getPiece(x, y) == null) {
+                y+=yMod;
+                continue;
+            }
+            else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("lance") || getPiece(x, y).type.equalsIgnoreCase("rook"))) {
+                return(true);
+            } else {
+                break;
+            }
+        }
+        // If the king is checked by a rook
+        x = p.xPos;
+        y = p.yPos - yMod;
+        while ((y < 9 && y >= 0) && (x < 9 && x >= 0)) {
+            if (getPiece(x, y) == null) {
+                y-=yMod;
+                continue;
+            }
+            else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("rook"))) {
+                return(true);
+            } else {
+                break;
+            }
+        }
+        x = p.xPos+1;
+        y = p.yPos;
+        while ((y < 9 && y >= 0) && (x < 9 && x >= 0)) {
+            if (getPiece(x, y) == null) {
+                x++;
+                continue;
+            }
+            else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("rook"))) {
+                return(true);
+            } else {
+                break;
+            }
+        }
+        x = p.xPos-1;
+        y = p.yPos;
+        while ((y < 9 && y >= 0) && (x < 9 && x >= 0)) {
+            if (getPiece(x, y) == null) {
+                x--;
+                continue;
+            }
+            else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("rook"))) {
+                return(true);
+            } else {
+                break;
+            }
+        }
+        // If the king is checked by a bishop
+        x = p.xPos + 1;
+        y = p.yPos + 1;
+        while ((y < 9 && y >= 0) && (x < 9 && x >= 0)) {
+            if (getPiece(x, y) == null) {
+                x++;
+                y++;
+                continue;
+            } else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("bishop"))) {
+                return(true);
+            } else {
+                break;
+            }
+        }
+        x = p.xPos - 1;
+        y = p.yPos + 1;
+        while ((y < 9 && y >= 0) && (x < 9 && x >= 0)) {
+            if (getPiece(x, y) == null) {
+                x--;
+                y++;
+                continue;
+            } else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("bishop"))) {
+                return(true);
+            } else {
+                break;
+            }
+        }
+        x = p.xPos + 1;
+        y = p.yPos - 1;
+        while ((y < 9 && y >= 0) && (x < 9 && x >= 0)) {
+            if (getPiece(x, y) == null) {
+                x++;
+                y--;
+                continue;
+            } else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("bishop"))) {
+                return(true);
+            } else {
+                break;
+            }
+        }
+        x = p.xPos - 1;
+        y = p.yPos - 1;
+        while ((y < 9 && y >= 0) && (x < 9 && x >= 0)) {
+            if (getPiece(x, y) == null) {
+                x--;
+                y--;
+                continue;
+            } else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("bishop"))) {
+                return(true);
+            } else {
+                break;
+            }
+        }
+        // If the king is checked by a knight
+        x = p.xPos;
+        y = p.yPos;
+        int[] knightX = {-1, +1};
+        int[] knightY = {+2, +2};
+        for (int i = 0; i < knightX.length; i++) {
+            if (getPiece((x+knightX[i]), (y+knightY[i])) == null) continue;
+            else if (getPiece((x+knightX[i]), (y+knightY[i])).type.equalsIgnoreCase("knight") && getPiece((x+knightX[i]), (y+knightY[i])).isSente != sente && !getPiece((x+knightX[i]), (y+knightY[i])
+            ).isPromoted) {
+                return(true);
+            }
+        }
+
+        // If the king is checked by a silver
+        x = p.xPos;
+        y = p.yPos;
+        int[] silverX = {-1, -1,  0, +1, +1};
+        int[] silverY = new int[5];
+        int mod = -yMod;
+        // {-1, +1, -1, +1, -1}
+        silverY[0] = -1*mod;
+        silverY[1] =  1*mod;
+        silverY[2] = -1*mod;
+        silverY[3] =  1*mod;
+        silverY[4] = -1*mod;
+
+        for (int i = 0; i < silverX.length; i++) {
+            if (getPiece((x+silverX[i]), (y+silverY[i])) == null) continue;
+            if (getPiece((x+silverX[i]), (y+silverY[i])) != null && (getPiece((x+silverX[i]), (y+silverY[i])).type.equalsIgnoreCase("silver")) && getPiece((x+silverX[i]), (y+silverY[i])).isSente != sente) {
+                return(true);
+            }
+        }
+
+        // If the king is checked by a gold
+        x = p.xPos;
+        y = p.yPos;
+        int[] goldX = {-1, -1,  0, +1, +1};
+        int[] goldY = new int[5];
+        // {-1, +1, -1, +1, -1}
+        goldY[0] = 0;
+        goldY[1] = -1*mod;
+        goldY[2] = 1*mod;
+        goldY[3] = -1*mod;
+        goldY[4] = 0;
+
+        for (int i = 0; i < silverX.length; i++) {
+            if (getPiece((x+goldX[i]), (y+goldY[i])) == null) continue;
+            if (getPiece((x+goldX[i]), (y+goldY[i])) != null && (getPiece((x+goldX[i]), (y+goldY[i])).type.equalsIgnoreCase("gold")) && getPiece((x+goldX[i]), (y+goldY[i])).isSente != sente) {
+                return(true);
+            }
+        }
+
+        // If the king is checked by a king
+        x = p.xPos;
+        y = p.yPos;
+        int[] kingX = {-1, -1, -1,  0,  0, +1, +1, +1};
+        int[] kingY = {-1,  0, +1, +1, -1, -1,  0, +1};
+        for (int i = 0; i < kingX.length; i++) {
+            if (getPiece(x+kingX[i], y+kingY[i]) == null) continue;
+            if (getPiece(x+kingX[i], y+kingY[i]) != null && (getPiece(x+kingX[i], y+kingY[i]).type.equalsIgnoreCase("king") || ((getPiece(x+kingX[i], y+kingY[i]).type.equalsIgnoreCase("bishop")) || getPiece(x+kingX[i], y+kingY[i]).type.equalsIgnoreCase("rook")) && (getPiece(x+kingX[i], y+kingY[i]).isPromoted)) && getPiece(x+kingX[i], y+kingY[i]).isSente != sente) {
+                return true;
+            }
+        }
+        // If the king is checked by a pawn
+        x = p.xPos;
+        y = p.yPos;
+        if (getPiece(x, y+1*yMod) != null) {
+            if (getPiece(x, y+1*yMod).type.equals("pawn")) return true;
+        }
+
+        return(false);
+    }
+    
     public static void main(String[] args) throws Exception {
         new App(1, 64);
     }
