@@ -21,6 +21,10 @@ public class Piece {
         isPromoted = true;
     }
 
+    public void unpromote() {
+        isPromoted = false;
+    }
+
     public void kill() {
         isDed = true;
         isSente = !isSente;

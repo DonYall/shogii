@@ -12,6 +12,7 @@ import javax.sound.sampled.*;
 public class App extends JFrame {
     private int posX = 0, posY = 0;
     private int numPlayers;
+    private boolean sente = true;
     private int pieceSize;
     private Piece[] pieces = new Piece[40];
     private Map<String, Integer> capturedPieces = new HashMap<>();
@@ -19,6 +20,9 @@ public class App extends JFrame {
     private URL moveURL = App.class.getResource("move.wav");
     private URL captureURL = App.class.getResource("capture.wav");
     private JPanel gamePanel;
+    private Piece trueGold = new Piece("gold", true, -1, -1);
+    private Piece falseGold = new Piece("gold", false, -1, -1);
+    private boolean promotion = false;
 
     public App(int numPlayers, int pieceSize) throws IOException {
         this.numPlayers = numPlayers;
@@ -162,7 +166,7 @@ public class App extends JFrame {
                 g.fillRect(0, 0, (int) (pieceSize * 9 * 16 / 9), (int) (pieceSize * 9));
                 g.drawImage(boardImage, 0, 0, null);
 
-                if (selectedPiece != null) {
+                if (selectedPiece != null && !promotion) {
                     for (int[] move : getAvailableSquares(selectedPiece)) {
                         if (getPiece(move[0], move[1]) == null) {
                             g.drawImage(moveImage, move[0] * pieceSize, move[1] * pieceSize, this);
@@ -186,13 +190,15 @@ public class App extends JFrame {
         addMouseMotionListener(new MouseMotionListener() {
             @Override
             public void mouseDragged(MouseEvent e) {
-                if (selectedPiece != null) {
+                if (selectedPiece != null && !promotion) {
                     // Drag piece
                     selectedPiece.x = e.getX() - pieceSize / 2;
                     selectedPiece.y = e.getY() - (int) pieceSize * 3 / 4;
                 } else if (getPieceFromLocation(e.getX(), e.getY()) != null) {
-                    // Pick up piece
-                    selectedPiece = getPieceFromLocation(e.getX(), e.getY());
+                    if (getPieceFromLocation(e.getX(), e.getY()).isSente == sente && !promotion) {
+                        // Pick up piece
+                        selectedPiece = getPieceFromLocation(e.getX(), e.getY());
+                    }
                 } else {
                     // Drag and drop window movement
                     setLocation(e.getXOnScreen() - posX, e.getYOnScreen() - posY);
@@ -219,23 +225,30 @@ public class App extends JFrame {
             @Override
             public void mouseReleased(MouseEvent e) {
                 if (selectedPiece != null) {
-                    if (getAvailableSquares(selectedPiece).stream().anyMatch(a -> Arrays.equals(a, new int[] {(int) e.getX() / pieceSize, (int) e.getY() / pieceSize}))) {
+                    if (!promotion && getAvailableSquares(selectedPiece).stream().anyMatch(a -> Arrays.equals(a, new int[] {(int) e.getX() / pieceSize, (int) e.getY() / pieceSize}))) {
                         // Drop piece
                         Piece p = getPiece((int) e.getX() / pieceSize, (int) e.getY() / pieceSize);
+                        sente = !sente;
                         if (p != null) {
                             playSound(captureURL);
                             p.kill();
+                            p.unpromote();
                             capture(p);
                             capturedPieces.put(String.valueOf(p.isSente) + p.type, capturedPieces.get(String.valueOf(p.isSente) + p.type) + 1);
                         } else {
                             playSound(moveURL);
                         }
+                        boolean ded = selectedPiece.isDed;
                         selectedPiece.move((int) e.getX() / pieceSize, (int) e.getY() / pieceSize);
-                        selectedPiece = null;
+                        if (ded) {
+                            selectedPiece = null;
+                        } else {
+                            promote(selectedPiece);
+                        }
                     } else {
                         // Return piece
                         selectedPiece.updatePos();
-                        selectedPiece = null;
+                        if (!promotion) selectedPiece = null;
                     }
                 }
                 repaint();
@@ -247,6 +260,33 @@ public class App extends JFrame {
 
             @Override
             public void mouseExited(MouseEvent e) {
+            }
+        });
+
+        addKeyListener(new KeyListener() {
+
+            @Override
+            public void keyPressed(KeyEvent e) {
+                if (promotion) {
+                    if (e.getKeyChar() == '1') {
+                        // Do not promote
+                        promotion = false;
+                    } else if (e.getKeyChar() == '2') {
+                        // Promote
+                        selectedPiece.promote();
+                        promotion = false;
+                    }
+                    selectedPiece = null;
+                    repaint();
+                }
+            }
+
+            @Override
+            public void keyReleased(KeyEvent e) {
+            }
+
+            @Override
+            public void keyTyped(KeyEvent e) {
             }
         });
         setVisible(true);
@@ -294,25 +334,35 @@ public class App extends JFrame {
     public int[][] getRawMoves(Piece p) {
         if (p.type.equals("knight")) {
             if (p.isSente) {
+                if (p.isPromoted) return getRawMoves(trueGold);
                 int[] xMoves = { -1, +1 };
                 int[] yMoves = { -2, -2 };
                 return (new int[][] { xMoves, yMoves });
             } else {
+                if (p.isPromoted) return getRawMoves(falseGold);
                 int[] xMoves = { -1, +1 };
                 int[] yMoves = { +2, +2 };
                 return (new int[][] { xMoves, yMoves });
             }
         } else if (p.type.equals("pawn")) {
             int mod = 1;
-            if (p.isSente)
+            if (p.isSente) {
+                if (p.isPromoted) return getRawMoves(trueGold);
                 mod = -1;
+            } else {
+                if (p.isPromoted) return getRawMoves(falseGold);
+            }
             int[] xMoves = { 0 };
             int[] yMoves = { 1 * mod };
             return (new int[][] { xMoves, yMoves });
         } else if (p.type.equals("lance")) {
             int mod = 1;
-            if (p.isSente)
+            if (p.isSente) {
+                if (p.isPromoted) return getRawMoves(trueGold);
                 mod = -1;
+            } else {
+                if (p.isPromoted) return getRawMoves(falseGold);
+            }
             int x;
             int y;
             ArrayList<Integer> xMoveList = new ArrayList<Integer>();
@@ -352,8 +402,10 @@ public class App extends JFrame {
             int[] yMoves = new int[5];
             int mod;
             if (p.isSente) {
+                if (p.isPromoted) return getRawMoves(trueGold);
                 mod = 1;
             } else {
+                if (p.isPromoted) return getRawMoves(falseGold);
                 mod = -1;
             }
             // {-1, +1, -1, +1, -1}
@@ -402,10 +454,13 @@ public class App extends JFrame {
             x = p.xPos;
             y = p.yPos + 1;
             while (x < 9 && x >= 0 && y < 9 && y >= 0) {
-                if (getPiece(x, y) == null)
+                if (getPiece(x, y) == null) {
                     yMoveList.add(y - p.yPos);
+                    xMoveList.add(0);
+                }
                 else if (getPiece(x, y).isSente != p.isSente) {
                     yMoveList.add(y - p.yPos);
+                    xMoveList.add(0);
                     break;
                 } else {
                     break;
@@ -415,10 +470,13 @@ public class App extends JFrame {
             x = p.xPos;
             y = p.yPos - 1;
             while (x < 9 && x >= 0 && y < 9 && y >= 0) {
-                if (getPiece(x, y) == null)
+                if (getPiece(x, y) == null) {
                     yMoveList.add(y - p.yPos);
+                    xMoveList.add(0);
+                }
                 else if (getPiece(x, y).isSente != p.isSente) {
                     yMoveList.add(y - p.yPos);
+                    xMoveList.add(0);
                     break;
                 } else {
                     break;
@@ -428,10 +486,13 @@ public class App extends JFrame {
             x = p.xPos + 1;
             y = p.yPos;
             while (x < 9 && x >= 0 && y < 9 && y >= 0) {
-                if (getPiece(x, y) == null)
+                if (getPiece(x, y) == null) {
                     xMoveList.add(x - p.xPos);
+                    yMoveList.add(0);
+                }
                 else if (getPiece(x, y).isSente != p.isSente) {
                     xMoveList.add(x - p.xPos);
+                    yMoveList.add(0);
                     break;
                 } else {
                     break;
@@ -441,25 +502,24 @@ public class App extends JFrame {
             x = p.xPos - 1;
             y = p.yPos;
             while (x < 9 && x >= 0 && y < 9 && y >= 0) {
-                if (getPiece(x, y) == null)
+                if (getPiece(x, y) == null) {
                     xMoveList.add(x - p.xPos);
+                    yMoveList.add(0);
+                }
                 else if (getPiece(x, y).isSente != p.isSente) {
                     xMoveList.add(x - p.xPos);
+                    yMoveList.add(0);
                     break;
                 } else {
                     break;
                 }
                 x--;
             }
-            int[] xMoves = new int[xMoveList.size() + yMoveList.size()];
-            int[] yMoves = new int[yMoveList.size() + xMoveList.size()];
+            int[] xMoves = new int[xMoveList.size()];
+            int[] yMoves = new int[yMoveList.size()];
             for (int i = 0; i < xMoveList.size(); i++) {
                 xMoves[i] = xMoveList.get(i);
-                yMoves[i] = 0;
-            }
-            for (int i = xMoveList.size(); i < xMoveList.size() + yMoveList.size(); i++) {
-                yMoves[i] = yMoveList.get(i - xMoveList.size());
-                xMoves[i] = 0;
+                yMoves[i] = yMoveList.get(i);
             }
             return (new int[][] { xMoves, yMoves });
         } else { // Bishop
@@ -632,6 +692,44 @@ public class App extends JFrame {
             xPos = 15;
         }
         p.move(xPos, yPos);
+    }
+
+    public void promote(Piece p) {
+        int floor;
+        if (p.isPromoted) {
+            selectedPiece = null;
+            return;
+        }
+        int mod;
+        if (p.isSente) {
+            floor = 0;
+            mod = 1;
+        } else {
+            floor = 8;
+            mod = -1;
+        }
+
+        // Forced promotions
+        if (p.yPos == floor && Arrays.asList("pawn", "lance", "knight").contains(p.type)) {
+            p.promote();
+            selectedPiece = null;
+            return;
+        } else if (p.yPos == floor+1*mod && p.type.equals("knight")) {
+            p.promote();
+            selectedPiece = null;
+            return;
+        }
+
+        // Promotion choices
+        if (Arrays.asList(floor, floor+1*mod, floor+2*mod).contains(p.yPos)) {
+            promotion = true;
+        } else {
+            selectedPiece = null;
+        }
+    }
+
+    public boolean isChecked() {
+        return true;
     }
 
     public static void main(String[] args) throws Exception {
