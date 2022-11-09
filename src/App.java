@@ -1,4 +1,7 @@
 import java.util.*;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import javax.swing.*;
 import java.io.*;
 import java.net.URL;
@@ -23,6 +26,7 @@ public class App extends JFrame {
     private Piece trueGold = new Piece("gold", true, -1, -1);
     private Piece falseGold = new Piece("gold", false, -1, -1);
     private boolean promotion = false;
+    private int positionsEvaluated = 0;
 
     public App(int numPlayers, int pieceSize) throws IOException {
         this.numPlayers = numPlayers;
@@ -88,6 +92,10 @@ public class App extends JFrame {
         // Board image
         BufferedImage bufferedBoard = ImageIO.read(getClass().getResource("board.png"));
         Image boardImage = (bufferedBoard.getScaledInstance(pieceSize * 9, pieceSize * 9, BufferedImage.SCALE_SMOOTH));
+
+        // Promotion image
+        BufferedImage bufferedPromo = ImageIO.read(getClass().getResource("promo.png"));
+        Image promoImage = (bufferedPromo.getScaledInstance(pieceSize * 9, pieceSize * 9, BufferedImage.SCALE_SMOOTH));
 
         // Piece images
         BufferedImage bufferedPieces = ImageIO.read(getClass().getResource("pieces.png"));
@@ -181,6 +189,10 @@ public class App extends JFrame {
                             String.valueOf(pieces[i].isSente) + String.valueOf(pieces[i].isPromoted) + pieces[i].type),
                             pieces[i].x, pieces[i].y, this);
                 }
+                
+                if (promotion) {
+                    g.drawImage(promoImage, 0, 0, null);
+                }
             }
         };
 
@@ -193,7 +205,7 @@ public class App extends JFrame {
                 if (selectedPiece != null && !promotion) {
                     // Drag piece
                     selectedPiece.x = e.getX() - pieceSize / 2;
-                    selectedPiece.y = e.getY() - (int) pieceSize * 3 / 4;
+                    selectedPiece.y = e.getY() - pieceSize / 2;
                 } else if (getPieceFromLocation(e.getX(), e.getY()) != null) {
                     if (getPieceFromLocation(e.getX(), e.getY()).isSente == sente && !promotion) {
                         // Pick up piece
@@ -240,18 +252,29 @@ public class App extends JFrame {
                         }
                         boolean ded = selectedPiece.isDed;
                         selectedPiece.move((int) e.getX() / pieceSize, (int) e.getY() / pieceSize);
+                        boolean promo = false;
                         if (ded) {
                             selectedPiece = null;
                         } else {
-                            promote(selectedPiece);
+                            promo = promote(selectedPiece);
+                        }
+                        repaint();
+                        if (!promo) {
+                            SwingUtilities.invokeLater(new Runnable() {
+                                @Override
+                                public void run() {
+                                    //System.out.println(search(2, Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY, sente));
+                                    aiMove();
+                                }
+                            });    
                         }
                     } else {
                         // Return piece
                         selectedPiece.updatePos();
                         if (!promotion) selectedPiece = null;
+                        repaint();
                     }
                 }
-                repaint();
             }
 
             @Override
@@ -278,6 +301,12 @@ public class App extends JFrame {
                     }
                     selectedPiece = null;
                     repaint();
+                    SwingUtilities.invokeLater(new Runnable() {
+                        @Override
+                        public void run() {
+                            aiMove();
+                        }
+                    }); 
                 }
             }
 
@@ -621,6 +650,7 @@ public class App extends JFrame {
 
     public ArrayList<int[]> getAvailableSquares(Piece p) {
         ArrayList<int[]> squares = new ArrayList<int[]>();
+        if (p.xPos < 0) return squares;
         if (p.isDed) {
             // Piece dropping mechanics
             int yStart = 0;
@@ -660,27 +690,74 @@ public class App extends JFrame {
         }
 
         // Check if move leaves you in check
-        int[] origin = {p.xPos, p.yPos};
-        for (int i = 0; i < squares.size(); i++) {
-            int[] move = squares.get(i);
-            Piece killedPiece = getPiece(move[0], move[1]);
-            boolean killedPromoted = false;
-            p.fakeMove(move[0], move[1]);
-            if (killedPiece != null) {
-                killedPromoted = killedPiece.isPromoted;
-                killedPiece.fakeMove(-3, -3);
+        if (!(p.isDed && !isChecked(p.isSente))) {
+            int[] origin = {p.xPos, p.yPos};
+            for (int i = 0; i < squares.size(); i++) {
+                int[] move = squares.get(i);
+                Piece killedPiece = getPiece(move[0], move[1]);
+                boolean killedPromoted = false;
+                p.fakeMove(move[0], move[1]);
+                if (killedPiece != null) {
+                    killedPromoted = killedPiece.isPromoted;
+                    killedPiece.fakeMove(-3, -3);
+                }
+                if (isChecked(p.isSente)) {
+                    squares.remove(move);
+                    i--;
+                }
+                p.fakeMove(origin[0], origin[1]);
+                if (killedPiece != null) {
+                    killedPiece.fakeMove(move[0], move[1]);
+                    killedPiece.isPromoted = killedPromoted;
+                }
             }
-            if (isChecked(p.isSente)) {
-                squares.remove(move);
+            squares.trimToSize();
+        }
+
+        return squares;
+    }
+
+    public ArrayList<int[]> getSemiAvailableSquares(Piece p) {
+        ArrayList<int[]> squares = new ArrayList<int[]>();
+        if (p.xPos < 0) return squares;
+        if (p.isDed) {
+            // Piece dropping mechanics
+            int yStart = 0;
+            int yLimit = 9;
+            if (p.type.equals("pawn") || p.type.equals("lance")) {
+                if (p.isSente) {
+                    yStart = 1;
+                } else {
+                    yLimit = 8;
+                }
+            } else if (p.type.equals("knight")) {
+                if (p.isSente) {
+                    yStart = 2;
+                } else {
+                    yLimit = 7;
+                }
             }
-            p.fakeMove(origin[0], origin[1]);
-            if (killedPiece != null) {
-                killedPiece.fakeMove(move[0], move[1]);
-                killedPiece.isPromoted = killedPromoted;
+            for (int r = yStart; r < yLimit; r++) {
+                for (int c = 0; c < 9; c++) {
+                    if (getPiece(c, r) == null) {
+                        squares.add(new int[] {c, r});
+                    }
+                }
+            }
+        } else {
+            int[][] moves = getRawMoves(p);
+            for (int i = 0; i < moves[0].length; i++) {
+                int[] move = new int[] {p.xPos + moves[0][i], p.yPos + moves[1][i]};
+                if (inBounds(move)) {
+                    if (getPiece(move[0], move[1]) == null) {
+                        squares.add(move);
+                    } else if (getPiece(move[0], move[1]).isSente != p.isSente) {
+                        squares.add(move);
+                    }
+                }
             }
         }
 
-        squares.trimToSize();
         return squares;
     }
 
@@ -718,11 +795,11 @@ public class App extends JFrame {
         p.move(xPos, yPos);
     }
 
-    public void promote(Piece p) {
+    public boolean promote(Piece p) {
         int floor;
         if (p.isPromoted) {
             selectedPiece = null;
-            return;
+            return false;
         }
         int mod;
         if (p.isSente) {
@@ -737,19 +814,25 @@ public class App extends JFrame {
         if (p.yPos == floor && Arrays.asList("pawn", "lance", "knight").contains(p.type)) {
             p.promote();
             selectedPiece = null;
-            return;
+            return false;
         } else if (p.yPos == floor+1*mod && p.type.equals("knight")) {
             p.promote();
             selectedPiece = null;
-            return;
+            return false;
         }
 
         // Promotion choices
         if (Arrays.asList(floor, floor+1*mod, floor+2*mod).contains(p.yPos)) {
+            if (numPlayers == 1 && !p.isSente) {
+                p.promote();
+                return false;
+            }
             promotion = true;
+            return true;
         } else {
             selectedPiece = null;
         }
+        return false;
     }
 
     public boolean isChecked(boolean sente) {
@@ -761,117 +844,153 @@ public class App extends JFrame {
         if (sente) p = pieces[38];
         else p = pieces[39];
         // If the king is checked by a lance
-        if (getPiece(p.xPos+1, p.yPos) != null) {
-            if (getPiece(p.xPos+1, p.yPos).type.equalsIgnoreCase("lance") && getPiece(p.xPos+1, p.yPos).isSente != sente) return true;
-        } else if (getPiece(p.xPos-1, p.yPos) != null) {
-            if (getPiece(p.xPos-1, p.yPos).type.equalsIgnoreCase("lance") && getPiece(p.xPos-1, p.yPos).isSente != sente) return true;
+        boolean file = false;
+        for(int i = 18; i <= 21; i++) {
+            if (pieces[i].xPos == p.xPos && pieces[i].isSente != p.isSente) file = true;
         }
-
         int x = p.xPos;
         int y = p.yPos + yMod;
-        while (y < 9 && y >= 0) {
-            if (getPiece(x, y) == null) {
-                y+=yMod;
-                continue;
-            }
-            else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("lance") || getPiece(x, y).type.equalsIgnoreCase("rook"))) {
-                return(true);
-            } else {
-                break;
+        if (file) {
+            while (y < 9 && y >= 0) {
+                if (getPiece(x, y) == null) {
+                    y+=yMod;
+                    continue;
+                }
+                else if (getPiece(x, y).isSente != sente && ((getPiece(x, y).type.equalsIgnoreCase("lance") && !getPiece(x, y).isPromoted) || getPiece(x, y).type.equalsIgnoreCase("rook"))) {
+                    return(true);
+                } else {
+                    break;
+                }
             }
         }
+
         // If the king is checked by a rook
-        x = p.xPos;
-        y = p.yPos - yMod;
-        while ((y < 9 && y >= 0) && (x < 9 && x >= 0)) {
-            if (getPiece(x, y) == null) {
-                y-=yMod;
-                continue;
-            }
-            else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("rook"))) {
-                return(true);
-            } else {
-                break;
-            }
-        }
-        x = p.xPos+1;
-        y = p.yPos;
-        while ((y < 9 && y >= 0) && (x < 9 && x >= 0)) {
-            if (getPiece(x, y) == null) {
-                x++;
-                continue;
-            }
-            else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("rook"))) {
-                return(true);
-            } else {
-                break;
+        file = false;
+        boolean row = false;
+        for (int i = 36; i <= 37; i++) {
+            if (pieces[i].isSente != p.isSente) {
+                if (pieces[i].xPos == p.xPos) {
+                    file = true;
+                }
+                if (pieces[i].yPos == p.yPos) {
+                    row = true;
+                }    
             }
         }
-        x = p.xPos-1;
-        y = p.yPos;
-        while ((y < 9 && y >= 0) && (x < 9 && x >= 0)) {
-            if (getPiece(x, y) == null) {
-                x--;
-                continue;
+        if (file || row) {
+            x = p.xPos;
+            y = p.yPos - 1;
+            while ((y < 9 && y >= 0) && (x < 9 && x >= 0)) {
+                if (getPiece(x, y) == null) {
+                    y--;
+                    continue;
+                }
+                else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("rook"))) {
+                    return(true);
+                } else {
+                    break;
+                }
             }
-            else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("rook"))) {
-                return(true);
-            } else {
-                break;
+            x = p.xPos;
+            y = p.yPos + 1;
+            while ((y < 9 && y >= 0) && (x < 9 && x >= 0)) {
+                if (getPiece(x, y) == null) {
+                    y++;
+                    continue;
+                }
+                else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("rook"))) {
+                    return(true);
+                } else {
+                    break;
+                }
             }
+            x = p.xPos+1;
+            y = p.yPos;
+            while ((y < 9 && y >= 0) && (x < 9 && x >= 0)) {
+                if (getPiece(x, y) == null) {
+                    x++;
+                    continue;
+                }
+                else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("rook"))) {
+                    return(true);
+                } else {
+                    break;
+                }
+            }
+            x = p.xPos-1;
+            y = p.yPos;
+            while ((y < 9 && y >= 0) && (x < 9 && x >= 0)) {
+                if (getPiece(x, y) == null) {
+                    x--;
+                    continue;
+                }
+                else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("rook"))) {
+                    return(true);
+                } else {
+                    break;
+                }
+            }    
         }
         // If the king is checked by a bishop
-        x = p.xPos + 1;
-        y = p.yPos + 1;
-        while ((y < 9 && y >= 0) && (x < 9 && x >= 0)) {
-            if (getPiece(x, y) == null) {
-                x++;
-                y++;
-                continue;
-            } else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("bishop"))) {
-                return(true);
-            } else {
-                break;
+        boolean diagonal = false;
+        for (int i = 34; i <= 35; i++) {
+            if (pieces[i].isSente != p.isSente && Math.abs(pieces[i].xPos - p.xPos) == Math.abs(pieces[i].yPos - p.yPos)) {
+                diagonal = true;
             }
         }
-        x = p.xPos - 1;
-        y = p.yPos + 1;
-        while ((y < 9 && y >= 0) && (x < 9 && x >= 0)) {
-            if (getPiece(x, y) == null) {
-                x--;
-                y++;
-                continue;
-            } else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("bishop"))) {
-                return(true);
-            } else {
-                break;
+        if (diagonal) {
+            x = p.xPos + 1;
+            y = p.yPos + 1;
+            while ((y < 9 && y >= 0) && (x < 9 && x >= 0)) {
+                if (getPiece(x, y) == null) {
+                    x++;
+                    y++;
+                    continue;
+                } else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("bishop"))) {
+                    return(true);
+                } else {
+                    break;
+                }
             }
-        }
-        x = p.xPos + 1;
-        y = p.yPos - 1;
-        while ((y < 9 && y >= 0) && (x < 9 && x >= 0)) {
-            if (getPiece(x, y) == null) {
-                x++;
-                y--;
-                continue;
-            } else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("bishop"))) {
-                return(true);
-            } else {
-                break;
+            x = p.xPos - 1;
+            y = p.yPos + 1;
+            while ((y < 9 && y >= 0) && (x < 9 && x >= 0)) {
+                if (getPiece(x, y) == null) {
+                    x--;
+                    y++;
+                    continue;
+                } else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("bishop"))) {
+                    return(true);
+                } else {
+                    break;
+                }
             }
-        }
-        x = p.xPos - 1;
-        y = p.yPos - 1;
-        while ((y < 9 && y >= 0) && (x < 9 && x >= 0)) {
-            if (getPiece(x, y) == null) {
-                x--;
-                y--;
-                continue;
-            } else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("bishop"))) {
-                return(true);
-            } else {
-                break;
+            x = p.xPos + 1;
+            y = p.yPos - 1;
+            while ((y < 9 && y >= 0) && (x < 9 && x >= 0)) {
+                if (getPiece(x, y) == null) {
+                    x++;
+                    y--;
+                    continue;
+                } else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("bishop"))) {
+                    return(true);
+                } else {
+                    break;
+                }
             }
+            x = p.xPos - 1;
+            y = p.yPos - 1;
+            while ((y < 9 && y >= 0) && (x < 9 && x >= 0)) {
+                if (getPiece(x, y) == null) {
+                    x--;
+                    y--;
+                    continue;
+                } else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("bishop"))) {
+                    return(true);
+                } else {
+                    break;
+                }
+            }     
         }
         // If the king is checked by a knight
         x = p.xPos;
@@ -901,7 +1020,7 @@ public class App extends JFrame {
 
         for (int i = 0; i < silverX.length; i++) {
             if (getPiece((x+silverX[i]), (y+silverY[i])) == null) continue;
-            if (getPiece((x+silverX[i]), (y+silverY[i])) != null && (getPiece((x+silverX[i]), (y+silverY[i])).type.equalsIgnoreCase("silver")) && getPiece((x+silverX[i]), (y+silverY[i])).isSente != sente) {
+            if (getPiece((x+silverX[i]), (y+silverY[i])) != null && (getPiece((x+silverX[i]), (y+silverY[i])).type.equalsIgnoreCase("silver") && !getPiece(x, y).isPromoted) && getPiece((x+silverX[i]), (y+silverY[i])).isSente != sente) {
                 return(true);
             }
         }
@@ -909,18 +1028,19 @@ public class App extends JFrame {
         // If the king is checked by a gold
         x = p.xPos;
         y = p.yPos;
-        int[] goldX = {-1, -1,  0, +1, +1};
-        int[] goldY = new int[5];
+        int[] goldX = {-1, -1,  0, +1, +1, 0};
+        int[] goldY = new int[6];
         // {-1, +1, -1, +1, -1}
         goldY[0] = 0;
         goldY[1] = -1*mod;
         goldY[2] = 1*mod;
         goldY[3] = -1*mod;
         goldY[4] = 0;
+        goldY[5] = -1*mod;
 
-        for (int i = 0; i < silverX.length; i++) {
+        for (int i = 0; i < goldX.length; i++) {
             if (getPiece((x+goldX[i]), (y+goldY[i])) == null) continue;
-            if (getPiece((x+goldX[i]), (y+goldY[i])) != null && (getPiece((x+goldX[i]), (y+goldY[i])).type.equalsIgnoreCase("gold")) && getPiece((x+goldX[i]), (y+goldY[i])).isSente != sente) {
+            if (getPiece((x+goldX[i]), (y+goldY[i])) != null && (getPiece((x+goldX[i]), (y+goldY[i])).type.equalsIgnoreCase("gold") || getPiece((x+goldX[i]), (y+goldY[i])).isPromoted) && getPiece((x+goldX[i]), (y+goldY[i])).isSente != sente) {
                 return(true);
             }
         }
@@ -932,7 +1052,7 @@ public class App extends JFrame {
         int[] kingY = {-1,  0, +1, +1, -1, -1,  0, +1};
         for (int i = 0; i < kingX.length; i++) {
             if (getPiece(x+kingX[i], y+kingY[i]) == null) continue;
-            if (getPiece(x+kingX[i], y+kingY[i]) != null && (getPiece(x+kingX[i], y+kingY[i]).type.equalsIgnoreCase("king") || ((getPiece(x+kingX[i], y+kingY[i]).type.equalsIgnoreCase("bishop")) || getPiece(x+kingX[i], y+kingY[i]).type.equalsIgnoreCase("rook")) && (getPiece(x+kingX[i], y+kingY[i]).isPromoted)) && getPiece(x+kingX[i], y+kingY[i]).isSente != sente) {
+            if (getPiece(x+kingX[i], y+kingY[i]) != null && (getPiece(x+kingX[i], y+kingY[i]).type.equalsIgnoreCase("king") || (((getPiece(x+kingX[i], y+kingY[i]).type.equalsIgnoreCase("bishop")) || getPiece(x+kingX[i], y+kingY[i]).type.equalsIgnoreCase("rook")) && (getPiece(x+kingX[i], y+kingY[i]).isPromoted))) && getPiece(x+kingX[i], y+kingY[i]).isSente != sente) {
                 return true;
             }
         }
@@ -940,10 +1060,222 @@ public class App extends JFrame {
         x = p.xPos;
         y = p.yPos;
         if (getPiece(x, y+1*yMod) != null) {
-            if (getPiece(x, y+1*yMod).type.equals("pawn")) return true;
+            if (getPiece(x, y+1*yMod).type.equals("pawn") && getPiece(x, y+1*yMod).isSente != p.isSente) return true;
         }
 
         return(false);
+    }
+
+    public boolean isCheckmated(boolean sente) {
+        if (!isChecked(sente)) {
+            return false;
+        } else {
+            for (int i = 0; i < pieces.length; i++) {
+                if (pieces[i].isSente == sente && getAvailableSquares(pieces[i]).size() > 0) return false;
+            }
+            return true;
+        }
+    }
+
+    public float evaluate() {
+        float evaluation = 0;
+        if (isCheckmated(true)) return Float.NEGATIVE_INFINITY;
+        for(Piece p : pieces) {
+            p.updateValue();
+            if (p.isSente) {
+                evaluation += p.value;
+                if (!p.isDed) {
+                    evaluation += ((float) getSemiAvailableSquares(p).size())/10;
+                }
+            } else {
+                evaluation -= p.value;
+                if (!p.isDed) {
+                    evaluation -= ((float) getSemiAvailableSquares(p).size())/10;
+                }
+            }
+        }
+        return (float) Math.round(evaluation*100.0)/100;
+    }
+
+    public ArrayList<int[]> orderMoves(Piece p, ArrayList<int[]> squares) {
+        Map<int[], Double> orderedMoves = new HashMap<>();
+        for (int[] move : squares) {
+            double guess = 0;
+            Piece killedPiece = getPiece(move[0], move[1]);
+
+            if (killedPiece != null) {
+                guess = 10 * killedPiece.value - p.value;
+            }
+
+            int yMod = 1;
+            if (p.isSente) {
+                yMod = -1;
+            }
+
+            Piece pawn = getPiece(move[0], move[1]+yMod);
+            if (pawn != null && pawn.type.equals("pawn")) {
+                guess -= p.value;
+            }
+
+            orderedMoves.put(move, guess);
+        }
+        List<int[]> sortedStats = orderedMoves.entrySet().stream().sorted(Comparator.comparing(Map.Entry::getValue, Comparator.reverseOrder())).map(Map.Entry::getKey).collect(Collectors.toList());
+        return (new ArrayList<int[]>(sortedStats));
+    }
+
+    public float quiscenceSearch(float alpha, float beta, boolean isSente) {
+        float stand = evaluate();
+        if (stand >= beta) {
+            return beta;
+        }
+        if (alpha < stand) {
+            alpha = stand;
+        }
+
+        for (Piece p : pieces) {
+            if (p.isSente == isSente) {
+                for (int[] move : orderMoves(p, getSemiAvailableSquares(p))) {
+                    int[] origin = {p.xPos, p.yPos};
+                    Piece killedPiece = getPiece(move[0], move[1]);
+                    boolean killedPromoted = false;
+                    p.fakeMove(move[0], move[1]);
+                    if (killedPiece != null) {
+                        killedPromoted = killedPiece.isPromoted;
+                        killedPiece.fakeMove(-3, -3);
+                        if (!isChecked(p.isSente)) {
+                            float evaluation = -quiscenceSearch(-beta, -alpha, !isSente);
+                            p.fakeMove(origin[0], origin[1]);
+                            if (killedPiece != null) {
+                                killedPiece.fakeMove(move[0], move[1]);
+                                killedPiece.isPromoted = killedPromoted;
+                            }
+                            if (evaluation >= beta) {
+                                return beta;
+                            }
+                            if (evaluation > alpha) {
+                                alpha = evaluation;
+                            }    
+                        } else {
+                            p.fakeMove(origin[0], origin[1]);
+                            if (killedPiece != null) {
+                                killedPiece.fakeMove(move[0], move[1]);
+                                killedPiece.isPromoted = killedPromoted;
+                            }    
+                        }
+                    } else {
+                        p.fakeMove(origin[0], origin[1]);
+                    }
+                }    
+            }
+        }
+
+        return alpha;
+    }
+
+    public float search(int depth, float alpha, float beta, boolean isSente) {
+        if (depth == 0) {
+            //positionsEvaluated++;
+            //return evaluate();
+            return quiscenceSearch(alpha, beta, isSente);
+        }
+        if (isCheckmated(sente)) {
+            return Float.NEGATIVE_INFINITY;
+        }
+        for (Piece p : pieces) {
+            if (p.isSente == isSente) {
+                for (int[] move : orderMoves(p, getSemiAvailableSquares(p))) {
+                    int[] origin = {p.xPos, p.yPos};
+                    Piece killedPiece = getPiece(move[0], move[1]);
+                    boolean killedPromoted = false;
+                    p.fakeMove(move[0], move[1]);
+                    if (killedPiece != null) {
+                        killedPromoted = killedPiece.isPromoted;
+                        killedPiece.fakeMove(-3, -3);
+                    }
+    
+                    if (!isChecked(p.isSente)) {
+                        float evaluation = -search(depth-1, -beta, -alpha, !isSente);
+                        p.fakeMove(origin[0], origin[1]);
+                        if (killedPiece != null) {
+                            killedPiece.fakeMove(move[0], move[1]);
+                            killedPiece.isPromoted = killedPromoted;
+                        }
+                        if (evaluation >= beta) {
+                            return beta;
+                        }
+                        if (evaluation > alpha) {
+                            alpha = evaluation;
+                        }    
+                    } else {
+                        p.fakeMove(origin[0], origin[1]);
+                        if (killedPiece != null) {
+                            killedPiece.fakeMove(move[0], move[1]);
+                            killedPiece.isPromoted = killedPromoted;
+                        }
+                    }
+                }    
+            }
+        }
+        return alpha;
+    }
+
+    public void aiMove() {
+        float bestEvaluation = Float.POSITIVE_INFINITY;
+        Piece bestPiece = null;
+        int[] bestMove = new int[2];
+        positionsEvaluated = 0;
+        for (Piece p : pieces) {
+            if (!p.isSente) {
+                for (int[] move : getSemiAvailableSquares(p)) {
+                    int[] origin = {p.xPos, p.yPos};
+                    Piece killedPiece = getPiece(move[0], move[1]);
+                    boolean killedPromoted = false;
+                    p.fakeMove(move[0], move[1]);
+                    if (killedPiece != null) {
+                        killedPromoted = killedPiece.isPromoted;
+                        killedPiece.fakeMove(-3, -3);
+                    }
+
+                    if (!isChecked(false)) {
+                        float evaluation = search(2, Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY, true);
+                        // if (killedPiece != null) {
+                        //     evaluation = quiscenceSearch(Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY, true);
+                        // } else {
+                        //     evaluation = search(2, Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY, true);
+                        // }
+                        if (evaluation < bestEvaluation) {
+                            bestEvaluation = evaluation;
+                            bestPiece = p;
+                            bestMove[0] = move[0];
+                            bestMove[1] = move[1];
+                        }    
+                    }
+    
+                    p.fakeMove(origin[0], origin[1]);
+                    if (killedPiece != null) {
+                        killedPiece.fakeMove(move[0], move[1]);
+                        killedPiece.isPromoted = killedPromoted;
+                    }
+                }
+            }
+        }
+        System.out.println(bestEvaluation);
+        sente = !sente;
+        Piece p = getPiece(bestMove[0], bestMove[1]);
+        if (p != null) {
+            playSound(captureURL);
+            p.kill();
+            p.unpromote();
+            capture(p);
+            capturedPieces.put(String.valueOf(p.isSente) + p.type, capturedPieces.get(String.valueOf(p.isSente) + p.type) + 1);
+        } else {
+            playSound(moveURL);
+        }
+        bestPiece.move(bestMove[0], bestMove[1]);
+        promote(bestPiece);
+        sente = true;
+        repaint();
+        System.out.println(positionsEvaluated + " positions evaluated");
     }
     
     public static void main(String[] args) throws Exception {

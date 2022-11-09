@@ -45,9 +45,6 @@ public class Piece {
     }
 
     public void fakeMove(int xPos, int yPos) {
-        if (isDed && xPos < 9) {
-            isDed = false;
-        }
         this.xPos = xPos;
         this.yPos = yPos;    
     }
@@ -70,7 +67,7 @@ public class Piece {
                 value = 10.4;
             }
 
-        } else {
+        } else if (xPos >= 0) {
             if (type.equals("pawn")) {
                 if (isDed) {
                     value = 1.15;
@@ -114,6 +111,23 @@ public class Piece {
                     value = 10.4;
                 }
             }
+        } else {
+            if (type.equals("pawn")) {
+                value = -1.15;
+            } else if (type.equals("lance")) {
+                value = -4.8;
+            } else if (type.equals("knight")) {
+                value = -5.1;
+            } else if (type.equals("silver")) {
+                value = -7.2;
+            } else if (type.equals("gold")) {
+                value = -7.8;
+            } else if (type.equals("bishop")) {
+                value = -11.1;
+            } else if (type.equals("rook")) {
+                value = -12.7;
+            }
+
         }
     }
     public void updatePos() {
