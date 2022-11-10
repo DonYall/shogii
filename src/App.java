@@ -30,9 +30,10 @@ public class App extends JFrame {
     private boolean promotion = false;
     private int positionsEvaluated = 0;
 
-    public App(int numPlayers, int pieceSize) throws IOException {
+    public App(int numPlayers, int pieceSize, boolean start) throws IOException {
         this.numPlayers = numPlayers;
         this.pieceSize = pieceSize;
+        this.sente = start;
 
         // Pawns
         for (int i = 0; i < 9; i++) {
@@ -1183,8 +1184,8 @@ public class App extends JFrame {
 
         for (Piece p : pieces) {
             if (!p.isDed && p.isSente == isSente) {
-                for (int[] move : orderMoves(p, getSemiAvailableSquares(p))) {
-                //for (int[] move : getSemiAvailableSquares(p)) {
+                //for (int[] move : orderMoves(p, getSemiAvailableSquares(p))) {
+                for (int[] move : getSemiAvailableSquares(p)) {
                     int[] origin = {p.xPos, p.yPos};
                     Piece killedPiece = getPiece(move[0], move[1]);
                     boolean killedPromoted = false;
@@ -1204,7 +1205,7 @@ public class App extends JFrame {
                             }
                             if (evaluation > alpha) {
                                 alpha = evaluation;
-                            }    
+                            }
                         } else {
                             p.fakeMove(origin[0], origin[1]);
                             if (killedPiece != null) {
@@ -1264,7 +1265,7 @@ public class App extends JFrame {
                         }
                         if (evaluation > alpha) {
                             alpha = evaluation;
-                        }    
+                        }
                     } else {
                         p.fakeMove(origin[0], origin[1]);
                         if (killedPiece != null) {
@@ -1352,6 +1353,6 @@ public class App extends JFrame {
     }
     
     public static void main(String[] args) throws Exception {
-        new App(1, 64);
+        new App(1, 64, true);
     }
 }
