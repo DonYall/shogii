@@ -18,6 +18,8 @@ public class App extends JFrame {
     private boolean sente = true;
     private int pieceSize;
     private Piece[] pieces = new Piece[40];
+    private boolean[][] files = {{true, true, true, true, true, true, true, true, true}, 
+                                 {true, true, true, true, true, true, true, true, true}};
     private Map<String, Integer> capturedPieces = new HashMap<>();
     private Piece selectedPiece;
     private URL moveURL = App.class.getResource("move.wav");
@@ -243,6 +245,11 @@ public class App extends JFrame {
                         sente = !sente;
                         if (p != null) {
                             playSound(captureURL);
+                            if (p.type.equals("pawn")) {
+                                int i = 1;
+                                if (p.isSente) i = 0;
+                                files[i][p.xPos] = false;    
+                            }
                             p.kill();
                             p.unpromote();
                             capture(p);
@@ -259,12 +266,14 @@ public class App extends JFrame {
                             promo = promote(selectedPiece);
                         }
                         repaint();
-                        if (!promo) {
+                        if (!promo && numPlayers == 1) {
                             SwingUtilities.invokeLater(new Runnable() {
                                 @Override
                                 public void run() {
                                     //System.out.println(search(2, Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY, sente));
+                                    long startTime = System.nanoTime();
                                     aiMove();
+                                    System.out.println((System.nanoTime() - startTime)/1000000 + "ms");
                                 }
                             });    
                         }
@@ -301,12 +310,16 @@ public class App extends JFrame {
                     }
                     selectedPiece = null;
                     repaint();
-                    SwingUtilities.invokeLater(new Runnable() {
-                        @Override
-                        public void run() {
-                            aiMove();
-                        }
-                    }); 
+                    if (numPlayers == 1) {
+                        SwingUtilities.invokeLater(new Runnable() {
+                            @Override
+                            public void run() {
+                                long startTime = System.nanoTime();
+                                aiMove();
+                                System.out.println((System.nanoTime() - startTime)/1000000 + "ms");
+                            }
+                        });     
+                    }
                 }
             }
 
@@ -668,12 +681,24 @@ public class App extends JFrame {
                     yLimit = 7;
                 }
             }
-            for (int r = yStart; r < yLimit; r++) {
-                for (int c = 0; c < 9; c++) {
-                    if (getPiece(c, r) == null) {
-                        squares.add(new int[] {c, r});
+            if (p.type.equals("pawn")) {
+                int i = 1;
+                if (p.isSente) i = 0;
+                for (int r = yStart; r < yLimit; r++) {
+                    for (int c = 0; c < 9; c++) {
+                        if (getPiece(c, r) == null && !files[i][c]) {
+                            squares.add(new int[] {c, r});
+                        }
                     }
-                }
+                }    
+            } else {
+                for (int r = yStart; r < yLimit; r++) {
+                    for (int c = 0; c < 9; c++) {
+                        if (getPiece(c, r) == null) {
+                            squares.add(new int[] {c, r});
+                        }
+                    }
+                }    
             }
         } else {
             int[][] moves = getRawMoves(p);
@@ -737,12 +762,24 @@ public class App extends JFrame {
                     yLimit = 7;
                 }
             }
-            for (int r = yStart; r < yLimit; r++) {
-                for (int c = 0; c < 9; c++) {
-                    if (getPiece(c, r) == null) {
-                        squares.add(new int[] {c, r});
+            if (p.type.equals("pawn")) {
+                int i = 1;
+                if (p.isSente) i = 0;
+                for (int r = yStart; r < yLimit; r++) {
+                    for (int c = 0; c < 9; c++) {
+                        if (getPiece(c, r) == null && !files[i][c]) {
+                            squares.add(new int[] {c, r});
+                        }
                     }
-                }
+                }    
+            } else {
+                for (int r = yStart; r < yLimit; r++) {
+                    for (int c = 0; c < 9; c++) {
+                        if (getPiece(c, r) == null) {
+                            squares.add(new int[] {c, r});
+                        }
+                    }
+                }    
             }
         } else {
             int[][] moves = getRawMoves(p);
@@ -1097,12 +1134,14 @@ public class App extends JFrame {
         return (float) Math.round(evaluation*100.0)/100;
     }
 
-    public ArrayList<int[]> orderMoves(Piece p, ArrayList<int[]> squares) {
+    public List<int[]> orderMoves(Piece p, ArrayList<int[]> squares) {
+        // Order captures, safer moves, forward moves, backward moves
         Map<int[], Double> orderedMoves = new HashMap<>();
         for (int[] move : squares) {
             double guess = 0;
             Piece killedPiece = getPiece(move[0], move[1]);
 
+            // Captures are usually good
             if (killedPiece != null) {
                 guess = 10 * killedPiece.value - p.value;
             }
@@ -1112,15 +1151,25 @@ public class App extends JFrame {
                 yMod = -1;
             }
 
+            // Moving in front of a pawn is usually bad
             Piece pawn = getPiece(move[0], move[1]+yMod);
             if (pawn != null && pawn.type.equals("pawn")) {
                 guess -= p.value;
             }
 
+            // Forward moves are usually good
+            int direction = yMod * (move[1] - p.yPos);
+            if (direction > 0) {
+                guess += 0.5;
+            }
+            // Backward moves are usually bad
+            else if (direction < 0) {
+                guess -= 0.5;
+            }
+
             orderedMoves.put(move, guess);
         }
-        List<int[]> sortedStats = orderedMoves.entrySet().stream().sorted(Comparator.comparing(Map.Entry::getValue, Comparator.reverseOrder())).map(Map.Entry::getKey).collect(Collectors.toList());
-        return (new ArrayList<int[]>(sortedStats));
+        return orderedMoves.entrySet().stream().sorted(Comparator.comparing(Map.Entry::getValue, Comparator.reverseOrder())).map(Map.Entry::getKey).collect(Collectors.toList());
     }
 
     public float quiscenceSearch(float alpha, float beta, boolean isSente) {
@@ -1133,8 +1182,9 @@ public class App extends JFrame {
         }
 
         for (Piece p : pieces) {
-            if (p.isSente == isSente) {
+            if (!p.isDed && p.isSente == isSente) {
                 for (int[] move : orderMoves(p, getSemiAvailableSquares(p))) {
+                //for (int[] move : getSemiAvailableSquares(p)) {
                     int[] origin = {p.xPos, p.yPos};
                     Piece killedPiece = getPiece(move[0], move[1]);
                     boolean killedPromoted = false;
@@ -1174,16 +1224,25 @@ public class App extends JFrame {
 
     public float search(int depth, float alpha, float beta, boolean isSente) {
         if (depth == 0) {
-            //positionsEvaluated++;
+            positionsEvaluated++;
             //return evaluate();
             return quiscenceSearch(alpha, beta, isSente);
         }
         if (isCheckmated(sente)) {
             return Float.NEGATIVE_INFINITY;
         }
+        ArrayList<String> dead = new ArrayList<>();
         for (Piece p : pieces) {
+            if (p.isDed) {
+                if (dead.contains(p.type)) {
+                    continue;
+                } else {
+                    dead.add(p.type);
+                }    
+            }
             if (p.isSente == isSente) {
                 for (int[] move : orderMoves(p, getSemiAvailableSquares(p))) {
+                //for (int[] move : getSemiAvailableSquares(p)) {
                     int[] origin = {p.xPos, p.yPos};
                     Piece killedPiece = getPiece(move[0], move[1]);
                     boolean killedPromoted = false;
@@ -1192,7 +1251,7 @@ public class App extends JFrame {
                         killedPromoted = killedPiece.isPromoted;
                         killedPiece.fakeMove(-3, -3);
                     }
-    
+
                     if (!isChecked(p.isSente)) {
                         float evaluation = -search(depth-1, -beta, -alpha, !isSente);
                         p.fakeMove(origin[0], origin[1]);
@@ -1224,9 +1283,18 @@ public class App extends JFrame {
         Piece bestPiece = null;
         int[] bestMove = new int[2];
         positionsEvaluated = 0;
+        ArrayList<String> dead = new ArrayList<>();
         for (Piece p : pieces) {
+            if (p.isDed) {
+                if (dead.contains(p.type)) {
+                    continue;
+                } else {
+                    dead.add(p.type);
+                }    
+            }
             if (!p.isSente) {
-                for (int[] move : getSemiAvailableSquares(p)) {
+                //for (int[] move : getSemiAvailableSquares(p)) {
+                for (int[] move : orderMoves(p, getSemiAvailableSquares(p))) {
                     int[] origin = {p.xPos, p.yPos};
                     Piece killedPiece = getPiece(move[0], move[1]);
                     boolean killedPromoted = false;
@@ -1237,12 +1305,12 @@ public class App extends JFrame {
                     }
 
                     if (!isChecked(false)) {
-                        float evaluation = search(2, Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY, true);
-                        // if (killedPiece != null) {
-                        //     evaluation = quiscenceSearch(Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY, true);
-                        // } else {
-                        //     evaluation = search(2, Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY, true);
-                        // }
+                        float evaluation; //= search(2, Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY, true);
+                        if (killedPiece != null) {
+                            evaluation = -quiscenceSearch(Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY, true);
+                        } else {
+                            evaluation = -search(3, Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY, true);
+                        }
                         if (evaluation < bestEvaluation) {
                             bestEvaluation = evaluation;
                             bestPiece = p;
@@ -1264,6 +1332,11 @@ public class App extends JFrame {
         Piece p = getPiece(bestMove[0], bestMove[1]);
         if (p != null) {
             playSound(captureURL);
+            if (p.type.equals("pawn")) {
+                int i = 1;
+                if (p.isSente) i = 0;
+                files[i][p.xPos] = false;    
+            }            
             p.kill();
             p.unpromote();
             capture(p);
