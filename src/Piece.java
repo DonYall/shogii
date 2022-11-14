@@ -4,15 +4,14 @@ public class Piece {
     boolean isPromoted;
     boolean isSente;
     boolean isDed;
-    int xPos, yPos;
+    int pos;
     int x, y;
     int pieceSize = 64;
 
-    public Piece(String type, boolean isSente, int yPos, int xPos) {
+    public Piece(String type, boolean isSente, int pos) {
         this.type = type;
         this.isSente = isSente;
-        this.xPos = xPos;
-        this.yPos = yPos;
+        this.pos = pos;
         updatePos();
         updateValue();
     }
@@ -28,46 +27,38 @@ public class Piece {
     public void kill() {
         isDed = true;
         isSente = !isSente;
-        // xPos = -1;
-        // yPos = -1;
-        // updatePos();
     }
 
-    public boolean move(int xPos, int yPos) {
-        if (isDed && xPos < 9) {
+    public boolean move(int pos) {
+        if (isDed && pos < 81) {
             isDed = false;
         }
-        this.xPos = xPos;
-        this.yPos = yPos;
-        x = xPos * pieceSize;
-        y = yPos * pieceSize;
+        this.pos = pos;
+        updatePos();
         return true;
     }
 
-    public void fakeMove(int xPos, int yPos) {
-        this.xPos = xPos;
-        this.yPos = yPos;    
+    public void fakeMove(int pos) {
+        this.pos = pos;
     }
 
     public void updateValue() {
         if (isPromoted) {
             if (type.equals("pawn")) {
-                value = 1;
+                value = 4.2;
             } else if (type.equals("lance")) {
-                value = 4.3;
+                value = 6.3;
             } else if (type.equals("knight")) {
-                value = 4.5;
-            } else if (type.equals("silver")) {
                 value = 6.4;
-            } else if (type.equals("gold")) {
-                value = 6.9;
+            } else if (type.equals("silver")) {
+                value = 6.7;
             } else if (type.equals("bishop")) {
-                value = 8.9;
+                value = 11.5;
             } else if (type.equals("rook")) {
-                value = 10.4;
+                value = 13;
             }
 
-        } else if (xPos >= 0) {
+        } else if (pos >= 0) {
             if (type.equals("pawn")) {
                 if (isDed) {
                     value = 1.15;
@@ -111,28 +102,21 @@ public class Piece {
                     value = 10.4;
                 }
             }
-        } else {
-            if (type.equals("pawn")) {
-                value = -1.15;
-            } else if (type.equals("lance")) {
-                value = -4.8;
-            } else if (type.equals("knight")) {
-                value = -5.1;
-            } else if (type.equals("silver")) {
-                value = -7.2;
-            } else if (type.equals("gold")) {
-                value = -7.8;
-            } else if (type.equals("bishop")) {
-                value = -11.1;
-            } else if (type.equals("rook")) {
-                value = -12.7;
-            }
-
         }
     }
     public void updatePos() {
-        x = xPos * pieceSize;
-        y = yPos * pieceSize;
+        if (!isDed) {
+            x = (pos % 9) * pieceSize;
+            y = pos / 9 * pieceSize;    
+        } else {
+            if (isSente) {
+                x = (pos-72)*pieceSize;
+                y = 8*pieceSize;
+            } else {
+                x = (pos-81)*pieceSize;
+                y = 0;
+            }
+        }
     }
 
 }

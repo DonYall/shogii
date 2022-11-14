@@ -25,8 +25,8 @@ public class App extends JFrame {
     private URL moveURL = App.class.getResource("move.wav");
     private URL captureURL = App.class.getResource("capture.wav");
     private JPanel gamePanel;
-    private Piece trueGold = new Piece("gold", true, -1, -1);
-    private Piece falseGold = new Piece("gold", false, -1, -1);
+    private Piece trueGold = new Piece("gold", true, -9);
+    private Piece falseGold = new Piece("gold", false, -9);
     private boolean promotion = false;
     private int positionsEvaluated = 0;
 
@@ -37,40 +37,40 @@ public class App extends JFrame {
 
         // Pawns
         for (int i = 0; i < 9; i++) {
-            pieces[i] = new Piece("pawn", true, 6, i);
+            pieces[i] = new Piece("pawn", true, i+54);
         }
         for (int i = 0; i < 9; i++) {
-            pieces[9 + i] = new Piece("pawn", false, 2, i);
+            pieces[9 + i] = new Piece("pawn", false, i+18);
         }
         // Lances
-        pieces[18] = new Piece("lance", true, 8, 8);
-        pieces[19] = new Piece("lance", true, 8, 0);
-        pieces[20] = new Piece("lance", false, 0, 8);
-        pieces[21] = new Piece("lance", false, 0, 0);
+        pieces[18] = new Piece("lance", true, 80);
+        pieces[19] = new Piece("lance", true, 72);
+        pieces[20] = new Piece("lance", false, 0);
+        pieces[21] = new Piece("lance", false, 8);
         // Knights
-        pieces[22] = new Piece("knight", true, 8, 1);
-        pieces[23] = new Piece("knight", true, 8, 7);
-        pieces[24] = new Piece("knight", false, 0, 1);
-        pieces[25] = new Piece("knight", false, 0, 7);
+        pieces[22] = new Piece("knight", true, 73);
+        pieces[23] = new Piece("knight", true, 79);
+        pieces[24] = new Piece("knight", false, 1);
+        pieces[25] = new Piece("knight", false, 7);
         // Silvers
-        pieces[26] = new Piece("silver", true, 8, 2);
-        pieces[27] = new Piece("silver", true, 8, 6);
-        pieces[28] = new Piece("silver", false, 0, 2);
-        pieces[29] = new Piece("silver", false, 0, 6);
+        pieces[26] = new Piece("silver", true, 74);
+        pieces[27] = new Piece("silver", true, 78);
+        pieces[28] = new Piece("silver", false, 2);
+        pieces[29] = new Piece("silver", false, 6);
         // Golds
-        pieces[30] = new Piece("gold", true, 8, 3);
-        pieces[31] = new Piece("gold", true, 8, 5);
-        pieces[32] = new Piece("gold", false, 0, 3);
-        pieces[33] = new Piece("gold", false, 0, 5);
+        pieces[30] = new Piece("gold", true, 75);
+        pieces[31] = new Piece("gold", true, 77);
+        pieces[32] = new Piece("gold", false, 3);
+        pieces[33] = new Piece("gold", false, 5);
         // Bishops
-        pieces[34] = new Piece("bishop", true, 7, 1);
-        pieces[35] = new Piece("bishop", false, 1, 7);
+        pieces[34] = new Piece("bishop", true, 64);
+        pieces[35] = new Piece("bishop", false, 16);
         // Rook
-        pieces[36] = new Piece("rook", true, 7, 7);
-        pieces[37] = new Piece("rook", false, 1, 1);
+        pieces[36] = new Piece("rook", true, 70);
+        pieces[37] = new Piece("rook", false, 10);
         // King
-        pieces[38] = new Piece("king", true, 8, 4);
-        pieces[39] = new Piece("king", false, 0, 4);
+        pieces[38] = new Piece("king", true, 76);
+        pieces[39] = new Piece("king", false, 4);
 
         // Dead pieces
         capturedPieces.put("truepawn", 0);
@@ -178,11 +178,11 @@ public class App extends JFrame {
                 g.drawImage(boardImage, 0, 0, null);
 
                 if (selectedPiece != null && !promotion) {
-                    for (int[] move : getAvailableSquares(selectedPiece)) {
-                        if (getPiece(move[0], move[1]) == null) {
-                            g.drawImage(moveImage, move[0] * pieceSize, move[1] * pieceSize, this);
+                    for (int move : getAvailableSquares(selectedPiece)) {
+                        if (getPiece(move) == null) {
+                            g.drawImage(moveImage, (move%9) * pieceSize, (move/9) * pieceSize, this);
                         } else {
-                            g.drawImage(captureImage, move[0] * pieceSize, move[1] * pieceSize, this);
+                            g.drawImage(captureImage, (move%9) * pieceSize, (move/9) * pieceSize, this);
                         }
                     }
                 }
@@ -240,16 +240,16 @@ public class App extends JFrame {
             @Override
             public void mouseReleased(MouseEvent e) {
                 if (selectedPiece != null) {
-                    if (!promotion && getAvailableSquares(selectedPiece).stream().anyMatch(a -> Arrays.equals(a, new int[] {(int) e.getX() / pieceSize, (int) e.getY() / pieceSize}))) {
+                    if (e.getX()/pieceSize < 9 && !promotion && getAvailableSquares(selectedPiece).contains((int) e.getX() / pieceSize + ((int) e.getY() / pieceSize)*9)) {
                         // Drop piece
-                        Piece p = getPiece((int) e.getX() / pieceSize, (int) e.getY() / pieceSize);
+                        Piece p = getPieceFromLocation(e.getX(), e.getY());
                         sente = !sente;
                         if (p != null) {
                             playSound(captureURL);
                             if (p.type.equals("pawn")) {
                                 int i = 1;
                                 if (p.isSente) i = 0;
-                                files[i][p.xPos] = false;    
+                                files[i][p.pos%9] = false;    
                             }
                             p.kill();
                             p.unpromote();
@@ -259,7 +259,7 @@ public class App extends JFrame {
                             playSound(moveURL);
                         }
                         boolean ded = selectedPiece.isDed;
-                        selectedPiece.move((int) e.getX() / pieceSize, (int) e.getY() / pieceSize);
+                        selectedPiece.move((int) e.getX() / pieceSize + ((int) e.getY() / pieceSize)*9);
                         boolean promo = false;
                         if (ded) {
                             selectedPiece = null;
@@ -333,6 +333,16 @@ public class App extends JFrame {
             }
         });
         setVisible(true);
+        if (!sente) {
+            SwingUtilities.invokeLater(new Runnable() {
+                @Override
+                public void run() {
+                    //aiMove();
+                    //pieces[15].move(6, 3);
+                    sente = !sente;
+                }
+            });    
+        }
     }
 
     public void playSound(URL url) {
@@ -349,16 +359,16 @@ public class App extends JFrame {
 
     public Piece getPieceFromLocation(int x, int y) {
         for (int i = 0; i < pieces.length; i++) {
-            if (pieces[i].xPos == (int) (x / pieceSize) && pieces[i].yPos == (int) (y / pieceSize)) {
+            if (pieces[i].pos == (int) x / pieceSize + ((int) y / pieceSize)*9) {
                 return pieces[i];
             }
         }
         return null;
     }
 
-    public Piece getPiece(int x, int y) {
+    public Piece getPiece(int pos) {
         for (int i = 0; i < pieces.length; i++) {
-            if (inBounds(new int[] {pieces[i].xPos, pieces[i].yPos}) && pieces[i].xPos == x && pieces[i].yPos == y) {
+            if (pieces[i].pos == pos) {
                 return pieces[i];
             }
         }
@@ -374,18 +384,18 @@ public class App extends JFrame {
         return null;
     }
 
-    public int[][] getRawMoves(Piece p) {
+    public int[] getRawMoves(Piece p) {
         if (p.type.equals("knight")) {
             if (p.isSente) {
                 if (p.isPromoted) return getRawMoves(trueGold);
-                int[] xMoves = { -1, +1 };
-                int[] yMoves = { -2, -2 };
-                return (new int[][] { xMoves, yMoves });
+                if (p.pos%9 == 8) return (new int[] { -19 });
+                else if (p.pos%9 == 0) return (new int[] { -17 });
+                return (new int[] { -17, -19 });
             } else {
                 if (p.isPromoted) return getRawMoves(falseGold);
-                int[] xMoves = { -1, +1 };
-                int[] yMoves = { +2, +2 };
-                return (new int[][] { xMoves, yMoves });
+                if (p.pos%9 == 8) return (new int[] { +17 });
+                else if (p.pos%9 == 0) return (new int[] { +19 });
+                return (new int[] { +17, +19 });
             }
         } else if (p.type.equals("pawn")) {
             int mod = 1;
@@ -395,9 +405,7 @@ public class App extends JFrame {
             } else {
                 if (p.isPromoted) return getRawMoves(falseGold);
             }
-            int[] xMoves = { 0 };
-            int[] yMoves = { 1 * mod };
-            return (new int[][] { xMoves, yMoves });
+            return (new int[] { 9*mod });
         } else if (p.type.equals("lance")) {
             int mod = 1;
             if (p.isSente) {
@@ -406,334 +414,205 @@ public class App extends JFrame {
             } else {
                 if (p.isPromoted) return getRawMoves(falseGold);
             }
-            int x;
-            int y;
-            ArrayList<Integer> xMoveList = new ArrayList<Integer>();
-            ArrayList<Integer> yMoveList = new ArrayList<Integer>();
-            x = p.xPos;
-            y = p.yPos + mod;
-            while (y < 9 && y >= 0) {
-                if (getPiece(x, y) == null) {
-                    yMoveList.add(y - p.yPos);
-                    xMoveList.add(0);
-                    y += mod;
+            int pos = p.pos + 9*mod;
+            ArrayList<Integer> moveList = new ArrayList<Integer>();
+            while (inBounds(pos)) {
+                if (getPiece(pos) == null) {
+                    moveList.add(pos - p.pos);
+                    pos += 9*mod;
                     continue;
-                } else if (getPiece(x, y).isSente != p.isSente) {
-                    yMoveList.add(y - p.yPos);
-                    xMoveList.add(0);
+                } else if (getPiece(pos).isSente != p.isSente) {
+                    moveList.add(pos - p.pos);
                     break;
                 } else {
                     break;
                 }
             }
-
-            int[] xMoves = new int[xMoveList.size()];
-            int[] yMoves = new int[yMoveList.size()];
-            for (int i = 0; i < xMoveList.size(); i++) {
-                xMoves[i] = xMoveList.get(i);
-            }
-            for (int i = 0; i < yMoveList.size(); i++) {
-                yMoves[i] = yMoveList.get(i);
-            }
-            return (new int[][] { xMoves, yMoves });
+            return (moveList.stream().mapToInt(i -> i).toArray());
         } else if (p.type.equals("king")) {
-            int[] xMoves = { -1, -1, -1, 0, 0, +1, +1, +1, +1, +1 };
-            int[] yMoves = { -1, 0, +1, +1, -1, -1, 0, +1, 0, 0 };
-            return (new int[][] { xMoves, yMoves });
+            if (p.pos%9 == 8) return (new int[] { -10, -9, -1, +8, +9 });
+            else if (p.pos%9 == 0) return (new int[] { -9, -8, +1, +9, +10 });
+            return (new int[] { -10, -9, -8, -1, +1, +8, +9, +10 });
         } else if (p.type.equals("silver")) {
-            int[] xMoves = { -1, -1, 0, +1, +1 };
-            int[] yMoves = new int[5];
-            int mod;
             if (p.isSente) {
                 if (p.isPromoted) return getRawMoves(trueGold);
-                mod = 1;
+                if (p.pos%9 == 8) return (new int[] { -10, -9, 8 });
+                else if (p.pos%9 == 0) return (new int[] {  -9, -8, 10 });
+                return (new int[] { -10, -9, -8, 8, 10 });
             } else {
                 if (p.isPromoted) return getRawMoves(falseGold);
-                mod = -1;
+                if (p.pos%9 == 8) return (new int[] { 9, 8, -10 });
+                else if (p.pos%9 == 0) return (new int[] {  10, 9, -8 });
+                return (new int[] { 10, 9, 8, -8, -10 });
             }
-            // {-1, +1, -1, +1, -1}
-            yMoves[0] = -1 * mod;
-            yMoves[1] = 1 * mod;
-            yMoves[2] = -1 * mod;
-            yMoves[3] = 1 * mod;
-            yMoves[4] = -1 * mod;
-            return (new int[][] { xMoves, yMoves });
         } else if (p.type.equals("gold")) {
-            int[] xMoves = { -1, 0, +1, +1, -1, 0 };
-            int[] yMoves = new int[6];
-            int mod;
             if (p.isSente) {
-                mod = 1;
+                if (p.pos%9 == 8) return (new int[] { -10, -9, -1, +9 });
+                else if (p.pos%9 == 0) return (new int[] { -9, -8, +1, +9 });
+                return (new int[] { -10, -9, -8, -1, +1, +9 });
             } else {
-                mod = -1;
+                if (p.pos%9 == 8) return (new int[] { 9, 8, -1, -9 });
+                else if (p.pos%9 == 0) return (new int[] {  10, 9, +1, -9 });
+                return (new int[] { 10, 9, 8, -1, +1, -9 });
             }
-            // {-1, +1, -1, +1, -1}
-            yMoves[0] = -1 * mod;
-            yMoves[1] = -1 * mod;
-            yMoves[2] = -1 * mod;
-            yMoves[3] = 0;
-            yMoves[4] = 0;
-            yMoves[5] = +1 * mod;
-            return (new int[][] { xMoves, yMoves });
 
         } else if (p.type.equals("rook")) {
-            int x;
-            int y;
-            ArrayList<Integer> xMoveList = new ArrayList<Integer>();
-            ArrayList<Integer> yMoveList = new ArrayList<Integer>();
+            int pos;
+            ArrayList<Integer> moveList = new ArrayList<Integer>();
             if (p.isPromoted) {
-                xMoveList.add(-1);
-                yMoveList.add(-1);
-
-                xMoveList.add(-1);
-                yMoveList.add(+1);
-
-                xMoveList.add(+1);
-                yMoveList.add(-1);
-
-                xMoveList.add(+1);
-                yMoveList.add(+1);
-            }
-            x = p.xPos;
-            y = p.yPos + 1;
-            while (x < 9 && x >= 0 && y < 9 && y >= 0) {
-                if (getPiece(x, y) == null) {
-                    yMoveList.add(y - p.yPos);
-                    xMoveList.add(0);
+                // Add diagonal moves
+                if (p.pos%9 < 8) {
+                    moveList.add(-8);
+                    moveList.add(+10);
                 }
-                else if (getPiece(x, y).isSente != p.isSente) {
-                    yMoveList.add(y - p.yPos);
-                    xMoveList.add(0);
+                if (p.pos%9 > 0) {
+                    moveList.add(-10);
+                    moveList.add(+8);    
+                }
+            }
+            pos = p.pos+9;
+            while (pos < 81) {
+                if (getPiece(pos) == null) {
+                    moveList.add(pos - p.pos);
+                    pos += 9;
+                }
+                else if (getPiece(pos).isSente != p.isSente) {
+                    moveList.add(pos - p.pos);
                     break;
                 } else {
                     break;
                 }
-                y++;
             }
-            x = p.xPos;
-            y = p.yPos - 1;
-            while (x < 9 && x >= 0 && y < 9 && y >= 0) {
-                if (getPiece(x, y) == null) {
-                    yMoveList.add(y - p.yPos);
-                    xMoveList.add(0);
+            pos = p.pos-9;
+            while (pos >= 0) {
+                if (getPiece(pos) == null) {
+                    moveList.add(pos - p.pos);
+                    pos -= 9;
                 }
-                else if (getPiece(x, y).isSente != p.isSente) {
-                    yMoveList.add(y - p.yPos);
-                    xMoveList.add(0);
+                else if (getPiece(pos).isSente != p.isSente) {
+                    moveList.add(pos - p.pos);
                     break;
                 } else {
                     break;
                 }
-                y--;
             }
-            x = p.xPos + 1;
-            y = p.yPos;
-            while (x < 9 && x >= 0 && y < 9 && y >= 0) {
-                if (getPiece(x, y) == null) {
-                    xMoveList.add(x - p.xPos);
-                    yMoveList.add(0);
+            int rowStart = ((int)(p.pos/9))*9;
+            for (int i = p.pos+1; i < rowStart+9; i++) {
+                if (getPiece(i) == null) {
+                    moveList.add(i - p.pos);
                 }
-                else if (getPiece(x, y).isSente != p.isSente) {
-                    xMoveList.add(x - p.xPos);
-                    yMoveList.add(0);
+                else if (getPiece(i).isSente != p.isSente) {
+                    moveList.add(i - p.pos);
                     break;
                 } else {
                     break;
                 }
-                x++;
             }
-            x = p.xPos - 1;
-            y = p.yPos;
-            while (x < 9 && x >= 0 && y < 9 && y >= 0) {
-                if (getPiece(x, y) == null) {
-                    xMoveList.add(x - p.xPos);
-                    yMoveList.add(0);
+            for (int i = p.pos-1; i >= rowStart; i--) {
+                if (getPiece(i) == null) {
+                    moveList.add(i - p.pos);
                 }
-                else if (getPiece(x, y).isSente != p.isSente) {
-                    xMoveList.add(x - p.xPos);
-                    yMoveList.add(0);
+                else if (getPiece(i).isSente != p.isSente) {
+                    moveList.add(i - p.pos);
                     break;
                 } else {
                     break;
                 }
-                x--;
             }
-            int[] xMoves = new int[xMoveList.size()];
-            int[] yMoves = new int[yMoveList.size()];
-            for (int i = 0; i < xMoveList.size(); i++) {
-                xMoves[i] = xMoveList.get(i);
-                yMoves[i] = yMoveList.get(i);
-            }
-            return (new int[][] { xMoves, yMoves });
+            return (moveList.stream().mapToInt(i -> i).toArray());
         } else { // Bishop
-            int x;
-            int y;
-            ArrayList<Integer> xMoveList = new ArrayList<Integer>();
-            ArrayList<Integer> yMoveList = new ArrayList<Integer>();
+            int pos;
+            ArrayList<Integer> moveList = new ArrayList<Integer>();
             if (p.isPromoted) {
-                xMoveList.add(-1);
-                yMoveList.add(0);
-
-                xMoveList.add(+1);
-                yMoveList.add(0);
-
-                xMoveList.add(0);
-                yMoveList.add(-1);
-
-                xMoveList.add(0);
-                yMoveList.add(+1);
+                // Add horizontal moves
+                if (p.pos%9 < 8) {
+                    moveList.add(+1);
+                }
+                if (p.pos%9 > 0) {
+                    moveList.add(-1);
+                }
+                moveList.add(-9);
+                moveList.add(+9);
             }
-            x = p.xPos + 1;
-            y = p.yPos + 1;
-            while (x < 9 && x >= 0 && y < 9 && y >= 0) {
-                if (getPiece(x, y) == null) {
-                    yMoveList.add(y - p.yPos);
-                    xMoveList.add(x - p.xPos);
-                } else if (getPiece(x, y).isSente != p.isSente) {
-                    yMoveList.add(y - p.yPos);
-                    xMoveList.add(x - p.xPos);
+            int rowStart = ((int)(p.pos/9))*9;
+            pos = p.pos + 10;
+            for (int i = p.pos+1; i < rowStart+9; i++) {
+                if (getPiece(pos) == null) {
+                    moveList.add(pos - p.pos);
+                }
+                else if (getPiece(pos).isSente != p.isSente) {
+                    moveList.add(pos - p.pos);
                     break;
                 } else {
                     break;
                 }
-                y++;
-                x++;
+                pos += 10;
             }
-            x = p.xPos + 1;
-            y = p.yPos - 1;
-            while (x < 9 && x >= 0 && y < 9 && y >= 0) {
-                if (getPiece(x, y) == null) {
-                    yMoveList.add(y - p.yPos);
-                    xMoveList.add(x - p.xPos);
-                } else if (getPiece(x, y).isSente != p.isSente) {
-                    yMoveList.add(y - p.yPos);
-                    xMoveList.add(x - p.xPos);
+            pos = p.pos + 8;
+            for (int i = p.pos-1; i >= rowStart; i--) {
+                if (getPiece(pos) == null) {
+                    moveList.add(pos - p.pos);
+                }
+                else if (getPiece(pos).isSente != p.isSente) {
+                    moveList.add(pos - p.pos);
                     break;
                 } else {
                     break;
                 }
-                y--;
-                x++;
+                pos += 8;
             }
-            x = p.xPos - 1;
-            y = p.yPos + 1;
-            while (x < 9 && x >= 0 && y < 9 && y >= 0) {
-                if (getPiece(x, y) == null) {
-                    yMoveList.add(y - p.yPos);
-                    xMoveList.add(x - p.xPos);
-                } else if (getPiece(x, y).isSente != p.isSente) {
-                    yMoveList.add(y - p.yPos);
-                    xMoveList.add(x - p.xPos);
+            pos = p.pos - 10;
+            for (int i = p.pos-1; i >= rowStart; i--) {
+                if (getPiece(pos) == null) {
+                    moveList.add(pos - p.pos);
+                }
+                else if (getPiece(pos).isSente != p.isSente) {
+                    moveList.add(pos - p.pos);
                     break;
                 } else {
                     break;
                 }
-                y++;
-                x--;
+                pos -= 10;
             }
-            x = p.xPos - 1;
-            y = p.yPos - 1;
-            while (x < 9 && x >= 0 && y < 9 && y >= 0) {
-                if (getPiece(x, y) == null) {
-                    yMoveList.add(y - p.yPos);
-                    xMoveList.add(x - p.xPos);
-                } else if (getPiece(x, y).isSente != p.isSente) {
-                    yMoveList.add(y - p.yPos);
-                    xMoveList.add(x - p.xPos);
+            pos = p.pos - 8;
+            for (int i = p.pos+1; i < rowStart+9; i++) {
+                if (getPiece(pos) == null) {
+                    moveList.add(pos - p.pos);
+                }
+                else if (getPiece(pos).isSente != p.isSente) {
+                    moveList.add(pos - p.pos);
                     break;
                 } else {
                     break;
                 }
-                y--;
-                x--;
+                pos -= 8;
             }
-            int[] xMoves = new int[xMoveList.size()];
-            int[] yMoves = new int[yMoveList.size()];
-            for (int i = 0; i < xMoveList.size(); i++) {
-                xMoves[i] = xMoveList.get(i);
-                yMoves[i] = yMoveList.get(i);
-            }
-            /*
-             * int[] yMoves = {+1, -1, 0, 0};
-             * int[] xMoves = { 0, 0, -1, +1};
-             */
-            return (new int[][] { xMoves, yMoves });
+            return (moveList.stream().mapToInt(i -> i).toArray());
 
         }
     }
 
-    public ArrayList<int[]> getAvailableSquares(Piece p) {
-        ArrayList<int[]> squares = new ArrayList<int[]>();
-        if (p.xPos < 0) return squares;
-        if (p.isDed) {
-            // Piece dropping mechanics
-            int yStart = 0;
-            int yLimit = 9;
-            if (p.type.equals("pawn") || p.type.equals("lance")) {
-                if (p.isSente) {
-                    yStart = 1;
-                } else {
-                    yLimit = 8;
-                }
-            } else if (p.type.equals("knight")) {
-                if (p.isSente) {
-                    yStart = 2;
-                } else {
-                    yLimit = 7;
-                }
-            }
-            if (p.type.equals("pawn")) {
-                int i = 1;
-                if (p.isSente) i = 0;
-                for (int r = yStart; r < yLimit; r++) {
-                    for (int c = 0; c < 9; c++) {
-                        if (getPiece(c, r) == null && !files[i][c]) {
-                            squares.add(new int[] {c, r});
-                        }
-                    }
-                }    
-            } else {
-                for (int r = yStart; r < yLimit; r++) {
-                    for (int c = 0; c < 9; c++) {
-                        if (getPiece(c, r) == null) {
-                            squares.add(new int[] {c, r});
-                        }
-                    }
-                }    
-            }
-        } else {
-            int[][] moves = getRawMoves(p);
-            for (int i = 0; i < moves[0].length; i++) {
-                int[] move = new int[] {p.xPos + moves[0][i], p.yPos + moves[1][i]};
-                if (inBounds(move)) {
-                    if (getPiece(move[0], move[1]) == null) {
-                        squares.add(move);
-                    } else if (getPiece(move[0], move[1]).isSente != p.isSente) {
-                        squares.add(move);
-                    }
-                }
-            }
-        }
-
+    public ArrayList<Integer> getAvailableSquares(Piece p) {
+        ArrayList<Integer> squares = getSemiAvailableSquares(p);
         // Check if move leaves you in check
         if (!(p.isDed && !isChecked(p.isSente))) {
-            int[] origin = {p.xPos, p.yPos};
+            int origin = p.pos;
             for (int i = 0; i < squares.size(); i++) {
-                int[] move = squares.get(i);
-                Piece killedPiece = getPiece(move[0], move[1]);
+                int move = squares.get(i);
+                Piece killedPiece = getPiece(move);
                 boolean killedPromoted = false;
-                p.fakeMove(move[0], move[1]);
+                p.fakeMove(move);
                 if (killedPiece != null) {
                     killedPromoted = killedPiece.isPromoted;
-                    killedPiece.fakeMove(-3, -3);
+                    killedPiece.fakeMove(-18);
                 }
                 if (isChecked(p.isSente)) {
-                    squares.remove(move);
+                    squares.remove(i);
                     i--;
                 }
-                p.fakeMove(origin[0], origin[1]);
+                p.fakeMove(origin);
                 if (killedPiece != null) {
-                    killedPiece.fakeMove(move[0], move[1]);
+                    killedPiece.fakeMove(move);
                     killedPiece.isPromoted = killedPromoted;
                 }
             }
@@ -743,10 +622,10 @@ public class App extends JFrame {
         return squares;
     }
 
-    public ArrayList<int[]> getSemiAvailableSquares(Piece p) {
-        ArrayList<int[]> squares = new ArrayList<int[]>();
-        if (p.xPos < 0) return squares;
-        if (p.isDed) {
+    public ArrayList<Integer> getSemiAvailableSquares(Piece p) {
+        ArrayList<Integer> squares = new ArrayList<Integer>();
+        if (p.pos < 0) return squares;
+        if (p.isDed && p.pos >= 81) {
             // Piece dropping mechanics
             int yStart = 0;
             int yLimit = 9;
@@ -766,71 +645,64 @@ public class App extends JFrame {
             if (p.type.equals("pawn")) {
                 int i = 1;
                 if (p.isSente) i = 0;
-                for (int r = yStart; r < yLimit; r++) {
-                    for (int c = 0; c < 9; c++) {
-                        if (getPiece(c, r) == null && !files[i][c]) {
-                            squares.add(new int[] {c, r});
-                        }
+                for (int index = yStart*9; index < yLimit*9; index++) {
+                    if (getPiece(index) == null && !files[i][index%9]) { // Double pawn drop
+                        squares.add(index);
                     }
-                }    
+                } 
             } else {
-                for (int r = yStart; r < yLimit; r++) {
-                    for (int c = 0; c < 9; c++) {
-                        if (getPiece(c, r) == null) {
-                            squares.add(new int[] {c, r});
-                        }
+                for (int index = yStart*9; index < yLimit*9; index++) {
+                    if (getPiece(index) == null) {
+                        squares.add(index);
                     }
-                }    
+                } 
+
             }
         } else {
-            int[][] moves = getRawMoves(p);
-            for (int i = 0; i < moves[0].length; i++) {
-                int[] move = new int[] {p.xPos + moves[0][i], p.yPos + moves[1][i]};
-                if (inBounds(move)) {
-                    if (getPiece(move[0], move[1]) == null) {
+            int[] moves = getRawMoves(p);
+            for (int i = 0; i < moves.length; i++) {
+                int move = p.pos + moves[i];
+                if (inBounds(move)) { // << FIX - GOTTA CHECK IF PIECE FALLS OFF MAP
+                    if (getPiece(move) == null) {
                         squares.add(move);
-                    } else if (getPiece(move[0], move[1]).isSente != p.isSente) {
+                    } else if (getPiece(move).isSente != p.isSente) {
                         squares.add(move);
                     }
                 }
             }
         }
-
         return squares;
     }
 
-    public boolean inBounds(int[] pos) {
-        if (pos[0] >= 0 && pos[0] < 9 && pos[1] >= 0 && pos[1] < 9) {
+    public boolean inBounds(int pos) {
+        if (pos >= 0 && pos < 81) {
             return true;
-        } else {
-            return false;
         }
+        return false;
     }
 
     public void capture(Piece p) {
-        int yPos = -1;
-        int xPos = -1;
-        if (p.isSente) {
-            yPos = 8;
-        } else {
-            yPos = 0;
+        int pos = -9;
+        int yMod = 0;
+        if (!p.isSente) {
+            yMod = 9;
         }
         if (p.type.equals("pawn")) {
-            xPos = 9;
+            pos = 81+yMod;
         } else if (p.type.equals("lance")) {
-            xPos = 10;
+            pos = 82+yMod;
         } else if (p.type.equals("knight")) {
-            xPos = 11;
+            pos = 83+yMod;
         } else if (p.type.equals("silver")) {
-            xPos = 12;
+            pos = 84+yMod;
         } else if (p.type.equals("gold")) {
-            xPos = 13;
+            pos = 85+yMod;
         } else if (p.type.equals("bishop")) {
-            xPos = 14;
+            pos = 86+yMod;
         } else if (p.type.equals("rook")) {
-            xPos = 15;
+            pos = 87+yMod;
         }
-        p.move(xPos, yPos);
+        p.move(pos);
     }
 
     public boolean promote(Piece p) {
@@ -849,18 +721,18 @@ public class App extends JFrame {
         }
 
         // Forced promotions
-        if (p.yPos == floor && Arrays.asList("pawn", "lance", "knight").contains(p.type)) {
+        if (p.pos/9 == floor && Arrays.asList("pawn", "lance", "knight").contains(p.type)) {
             p.promote();
             selectedPiece = null;
             return false;
-        } else if (p.yPos == floor+1*mod && p.type.equals("knight")) {
+        } else if (p.pos/9 == floor+1*mod && p.type.equals("knight")) {
             p.promote();
             selectedPiece = null;
             return false;
         }
 
         // Promotion choices
-        if (Arrays.asList(floor, floor+1*mod, floor+2*mod).contains(p.yPos)) {
+        if (Arrays.asList(floor, floor+1*mod, floor+2*mod).contains(p.pos/9)) {
             if (numPlayers == 1 && !p.isSente) {
                 p.promote();
                 return false;
@@ -881,225 +753,43 @@ public class App extends JFrame {
         Piece p;
         if (sente) p = pieces[38];
         else p = pieces[39];
-        // If the king is checked by a lance
-        boolean file = false;
-        for(int i = 18; i <= 21; i++) {
-            if (pieces[i].xPos == p.xPos && pieces[i].isSente != p.isSente) file = true;
+
+        // Knight checks
+        if (getPiece(p.pos+8*yMod) != null && getPiece(p.pos+8).isSente != p.isSente && getPiece(p.pos+8*yMod).type.equals("knight")) {
+            return true;
         }
-        int x = p.xPos;
-        int y = p.yPos + yMod;
-        if (file) {
-            while (y < 9 && y >= 0) {
-                if (getPiece(x, y) == null) {
-                    y+=yMod;
-                    continue;
-                }
-                else if (getPiece(x, y).isSente != sente && ((getPiece(x, y).type.equalsIgnoreCase("lance") && !getPiece(x, y).isPromoted) || getPiece(x, y).type.equalsIgnoreCase("rook"))) {
-                    return(true);
-                } else {
-                    break;
-                }
-            }
+        if (getPiece(p.pos+8*yMod) != null && getPiece(p.pos+8).isSente != p.isSente && getPiece(p.pos+8*yMod).type.equals("knight")) {
+            return true;
         }
 
-        // If the king is checked by a rook
-        file = false;
-        boolean row = false;
-        for (int i = 36; i <= 37; i++) {
-            if (pieces[i].isSente != p.isSente) {
-                if (pieces[i].xPos == p.xPos) {
-                    file = true;
-                }
-                if (pieces[i].yPos == p.yPos) {
-                    row = true;
-                }    
-            }
-        }
-        if (file || row) {
-            x = p.xPos;
-            y = p.yPos - 1;
-            while ((y < 9 && y >= 0) && (x < 9 && x >= 0)) {
-                if (getPiece(x, y) == null) {
-                    y--;
-                    continue;
-                }
-                else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("rook"))) {
-                    return(true);
-                } else {
-                    break;
-                }
-            }
-            x = p.xPos;
-            y = p.yPos + 1;
-            while ((y < 9 && y >= 0) && (x < 9 && x >= 0)) {
-                if (getPiece(x, y) == null) {
-                    y++;
-                    continue;
-                }
-                else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("rook"))) {
-                    return(true);
-                } else {
-                    break;
-                }
-            }
-            x = p.xPos+1;
-            y = p.yPos;
-            while ((y < 9 && y >= 0) && (x < 9 && x >= 0)) {
-                if (getPiece(x, y) == null) {
-                    x++;
-                    continue;
-                }
-                else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("rook"))) {
-                    return(true);
-                } else {
-                    break;
-                }
-            }
-            x = p.xPos-1;
-            y = p.yPos;
-            while ((y < 9 && y >= 0) && (x < 9 && x >= 0)) {
-                if (getPiece(x, y) == null) {
-                    x--;
-                    continue;
-                }
-                else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("rook"))) {
-                    return(true);
-                } else {
-                    break;
-                }
-            }    
-        }
-        // If the king is checked by a bishop
-        boolean diagonal = false;
-        for (int i = 34; i <= 35; i++) {
-            if (pieces[i].isSente != p.isSente && Math.abs(pieces[i].xPos - p.xPos) == Math.abs(pieces[i].yPos - p.yPos)) {
-                diagonal = true;
-            }
-        }
-        if (diagonal) {
-            x = p.xPos + 1;
-            y = p.yPos + 1;
-            while ((y < 9 && y >= 0) && (x < 9 && x >= 0)) {
-                if (getPiece(x, y) == null) {
-                    x++;
-                    y++;
-                    continue;
-                } else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("bishop"))) {
-                    return(true);
-                } else {
-                    break;
-                }
-            }
-            x = p.xPos - 1;
-            y = p.yPos + 1;
-            while ((y < 9 && y >= 0) && (x < 9 && x >= 0)) {
-                if (getPiece(x, y) == null) {
-                    x--;
-                    y++;
-                    continue;
-                } else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("bishop"))) {
-                    return(true);
-                } else {
-                    break;
-                }
-            }
-            x = p.xPos + 1;
-            y = p.yPos - 1;
-            while ((y < 9 && y >= 0) && (x < 9 && x >= 0)) {
-                if (getPiece(x, y) == null) {
-                    x++;
-                    y--;
-                    continue;
-                } else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("bishop"))) {
-                    return(true);
-                } else {
-                    break;
-                }
-            }
-            x = p.xPos - 1;
-            y = p.yPos - 1;
-            while ((y < 9 && y >= 0) && (x < 9 && x >= 0)) {
-                if (getPiece(x, y) == null) {
-                    x--;
-                    y--;
-                    continue;
-                } else if (getPiece(x, y).isSente != sente && (getPiece(x, y).type.equalsIgnoreCase("bishop"))) {
-                    return(true);
-                } else {
-                    break;
-                }
-            }     
-        }
-        // If the king is checked by a knight
-        x = p.xPos;
-        y = p.yPos;
-        int[] knightX = {-1, +1};
-        int[] knightY = {+2, +2};
-        for (int i = 0; i < knightX.length; i++) {
-            if (getPiece((x+knightX[i]), (y+knightY[i])) == null) continue;
-            else if (getPiece((x+knightX[i]), (y+knightY[i])).type.equalsIgnoreCase("knight") && getPiece((x+knightX[i]), (y+knightY[i])).isSente != sente && !getPiece((x+knightX[i]), (y+knightY[i])
-            ).isPromoted) {
-                return(true);
-            }
-        }
+        // Look through every direction
+        int rowStart = (p.pos/9) * 9;
 
-        // If the king is checked by a silver
-        x = p.xPos;
-        y = p.yPos;
-        int[] silverX = {-1, -1,  0, +1, +1};
-        int[] silverY = new int[5];
-        int mod = -yMod;
-        // {-1, +1, -1, +1, -1}
-        silverY[0] = -1*mod;
-        silverY[1] =  1*mod;
-        silverY[2] = -1*mod;
-        silverY[3] =  1*mod;
-        silverY[4] = -1*mod;
 
-        for (int i = 0; i < silverX.length; i++) {
-            if (getPiece((x+silverX[i]), (y+silverY[i])) == null) continue;
-            if (getPiece((x+silverX[i]), (y+silverY[i])) != null && (getPiece((x+silverX[i]), (y+silverY[i])).type.equalsIgnoreCase("silver") && !getPiece(x, y).isPromoted) && getPiece((x+silverX[i]), (y+silverY[i])).isSente != sente) {
-                return(true);
-            }
-        }
+        // // If the king is checked by a lance
+        // for(int i = 18; i <= 21; i++) {
+        //     if (pieces[i].isSente != p.isSente && !p.isPromoted) {
+        //         if (getPiece(getSemiAvailableSquares(pieces[i]).size()) == p) {
+        //             return true;
+        //         }
+        //     }
+        // }
 
-        // If the king is checked by a gold
-        x = p.xPos;
-        y = p.yPos;
-        int[] goldX = {-1, -1,  0, +1, +1, 0};
-        int[] goldY = new int[6];
-        // {-1, +1, -1, +1, -1}
-        goldY[0] = 0;
-        goldY[1] = -1*mod;
-        goldY[2] = 1*mod;
-        goldY[3] = -1*mod;
-        goldY[4] = 0;
-        goldY[5] = -1*mod;
+        // // If the king is checked by a pawn
+        // if (getPiece(p.pos+9*yMod) != null) {
+        //     if (getPiece(p.pos+9*yMod).type.equals("pawn") && !getPiece(p.pos+9*yMod).isPromoted && getPiece(p.pos+9*yMod).isSente != p.isSente) return true;
+        // }
 
-        for (int i = 0; i < goldX.length; i++) {
-            if (getPiece((x+goldX[i]), (y+goldY[i])) == null) continue;
-            if (getPiece((x+goldX[i]), (y+goldY[i])) != null && (getPiece((x+goldX[i]), (y+goldY[i])).type.equalsIgnoreCase("gold") || getPiece((x+goldX[i]), (y+goldY[i])).isPromoted) && getPiece((x+goldX[i]), (y+goldY[i])).isSente != sente) {
-                return(true);
-            }
-        }
-
-        // If the king is checked by a king
-        x = p.xPos;
-        y = p.yPos;
-        int[] kingX = {-1, -1, -1,  0,  0, +1, +1, +1};
-        int[] kingY = {-1,  0, +1, +1, -1, -1,  0, +1};
-        for (int i = 0; i < kingX.length; i++) {
-            if (getPiece(x+kingX[i], y+kingY[i]) == null) continue;
-            if (getPiece(x+kingX[i], y+kingY[i]) != null && (getPiece(x+kingX[i], y+kingY[i]).type.equalsIgnoreCase("king") || (((getPiece(x+kingX[i], y+kingY[i]).type.equalsIgnoreCase("bishop")) || getPiece(x+kingX[i], y+kingY[i]).type.equalsIgnoreCase("rook")) && (getPiece(x+kingX[i], y+kingY[i]).isPromoted))) && getPiece(x+kingX[i], y+kingY[i]).isSente != sente) {
-                return true;
-            }
-        }
-        // If the king is checked by a pawn
-        x = p.xPos;
-        y = p.yPos;
-        if (getPiece(x, y+1*yMod) != null) {
-            if (getPiece(x, y+1*yMod).type.equals("pawn") && getPiece(x, y+1*yMod).isSente != p.isSente) return true;
-        }
+        // // Pretty much any other piece
+        // for (int i = 22; i <= 39; i++) {
+        //     if (pieces[i].isSente != p.isSente) {
+        //         for (int move : getSemiAvailableSquares(pieces[i])) {
+        //             if (getPiece(move) == p) {
+        //                 return true;
+        //             }
+        //         }
+        //     }
+        // }
 
         return(false);
     }
@@ -1119,13 +809,26 @@ public class App extends JFrame {
         float evaluation = 0;
         if (isCheckmated(true)) return Float.NEGATIVE_INFINITY;
         for(Piece p : pieces) {
-            p.updateValue();
             if (p.isSente) {
+                if (p.pos /9 <= 2 && !p.isPromoted) {
+                    p.isPromoted = true;
+                    p.updateValue();
+                    p.isPromoted = false;
+                } else {
+                    p.updateValue();
+                }
                 evaluation += p.value;
                 if (!p.isDed) {
                     evaluation += ((float) getSemiAvailableSquares(p).size())/10;
                 }
             } else {
+                if (p.pos /9 >= 6 && !p.isPromoted) {
+                    p.isPromoted = true;
+                    p.updateValue();
+                    p.isPromoted = false;
+                } else {
+                    p.updateValue();
+                }
                 evaluation -= p.value;
                 if (!p.isDed) {
                     evaluation -= ((float) getSemiAvailableSquares(p).size())/10;
@@ -1135,12 +838,12 @@ public class App extends JFrame {
         return (float) Math.round(evaluation*100.0)/100;
     }
 
-    public List<int[]> orderMoves(Piece p, ArrayList<int[]> squares) {
+    public List<Integer> orderMoves(Piece p, ArrayList<Integer> squares) {
         // Order captures, safer moves, forward moves, backward moves
-        Map<int[], Double> orderedMoves = new HashMap<>();
-        for (int[] move : squares) {
+        Map<Integer, Double> orderedMoves = new HashMap<>();
+        for (int move : squares) {
             double guess = 0;
-            Piece killedPiece = getPiece(move[0], move[1]);
+            Piece killedPiece = getPiece(move);
 
             // Captures are usually good
             if (killedPiece != null) {
@@ -1153,13 +856,13 @@ public class App extends JFrame {
             }
 
             // Moving in front of a pawn is usually bad
-            Piece pawn = getPiece(move[0], move[1]+yMod);
+            Piece pawn = getPiece(move+9*yMod);
             if (pawn != null && pawn.type.equals("pawn")) {
                 guess -= p.value;
             }
 
             // Forward moves are usually good
-            int direction = yMod * (move[1] - p.yPos);
+            int direction = yMod * (move/9 - p.pos/9);
             if (direction > 0) {
                 guess += 0.5;
             }
@@ -1185,19 +888,23 @@ public class App extends JFrame {
         for (Piece p : pieces) {
             if (!p.isDed && p.isSente == isSente) {
                 //for (int[] move : orderMoves(p, getSemiAvailableSquares(p))) {
-                for (int[] move : getSemiAvailableSquares(p)) {
-                    int[] origin = {p.xPos, p.yPos};
-                    Piece killedPiece = getPiece(move[0], move[1]);
+                for (int move : getSemiAvailableSquares(p)) {
+                    int origin = p.pos;
+                    Piece killedPiece = getPiece(move);
                     boolean killedPromoted = false;
-                    p.fakeMove(move[0], move[1]);
+                    p.fakeMove(move);
                     if (killedPiece != null) {
                         killedPromoted = killedPiece.isPromoted;
-                        killedPiece.fakeMove(-3, -3);
+                        killedPiece.fakeMove(81);
+                        killedPiece.isSente = !killedPiece.isSente;
+                        killedPiece.isDed = true;
                         if (!isChecked(p.isSente)) {
                             float evaluation = -quiscenceSearch(-beta, -alpha, !isSente);
-                            p.fakeMove(origin[0], origin[1]);
+                            p.fakeMove(origin);
                             if (killedPiece != null) {
-                                killedPiece.fakeMove(move[0], move[1]);
+                                killedPiece.fakeMove(move);
+                                killedPiece.isDed = false;
+                                killedPiece.isSente = !killedPiece.isSente;
                                 killedPiece.isPromoted = killedPromoted;
                             }
                             if (evaluation >= beta) {
@@ -1207,14 +914,16 @@ public class App extends JFrame {
                                 alpha = evaluation;
                             }
                         } else {
-                            p.fakeMove(origin[0], origin[1]);
+                            p.fakeMove(origin);
                             if (killedPiece != null) {
-                                killedPiece.fakeMove(move[0], move[1]);
+                                killedPiece.fakeMove(move);
+                                killedPiece.isDed = false;
+                                killedPiece.isSente = !killedPiece.isSente;
                                 killedPiece.isPromoted = killedPromoted;
                             }    
                         }
                     } else {
-                        p.fakeMove(origin[0], origin[1]);
+                        p.fakeMove(origin);
                     }
                 }    
             }
@@ -1242,22 +951,26 @@ public class App extends JFrame {
                 }    
             }
             if (p.isSente == isSente) {
-                for (int[] move : orderMoves(p, getSemiAvailableSquares(p))) {
+                for (int move : orderMoves(p, getSemiAvailableSquares(p))) {
                 //for (int[] move : getSemiAvailableSquares(p)) {
-                    int[] origin = {p.xPos, p.yPos};
-                    Piece killedPiece = getPiece(move[0], move[1]);
+                    int origin = p.pos;
+                    Piece killedPiece = getPiece(move);
                     boolean killedPromoted = false;
-                    p.fakeMove(move[0], move[1]);
+                    p.fakeMove(move);
                     if (killedPiece != null) {
                         killedPromoted = killedPiece.isPromoted;
-                        killedPiece.fakeMove(-3, -3);
+                        killedPiece.fakeMove(81);
+                        killedPiece.isSente = !killedPiece.isSente;
+                        killedPiece.isDed = true;
                     }
 
                     if (!isChecked(p.isSente)) {
                         float evaluation = -search(depth-1, -beta, -alpha, !isSente);
-                        p.fakeMove(origin[0], origin[1]);
+                        p.fakeMove(origin);
                         if (killedPiece != null) {
-                            killedPiece.fakeMove(move[0], move[1]);
+                            killedPiece.fakeMove(move);
+                            killedPiece.isDed = false;
+                            killedPiece.isSente = !killedPiece.isSente;
                             killedPiece.isPromoted = killedPromoted;
                         }
                         if (evaluation >= beta) {
@@ -1267,9 +980,11 @@ public class App extends JFrame {
                             alpha = evaluation;
                         }
                     } else {
-                        p.fakeMove(origin[0], origin[1]);
+                        p.fakeMove(origin);
                         if (killedPiece != null) {
-                            killedPiece.fakeMove(move[0], move[1]);
+                            killedPiece.fakeMove(move);
+                            killedPiece.isDed = false;
+                            killedPiece.isSente = !killedPiece.isSente;
                             killedPiece.isPromoted = killedPromoted;
                         }
                     }
@@ -1282,7 +997,7 @@ public class App extends JFrame {
     public void aiMove() {
         float bestEvaluation = Float.POSITIVE_INFINITY;
         Piece bestPiece = null;
-        int[] bestMove = new int[2];
+        int bestMove = -9;
         positionsEvaluated = 0;
         ArrayList<String> dead = new ArrayList<>();
         for (Piece p : pieces) {
@@ -1295,18 +1010,20 @@ public class App extends JFrame {
             }
             if (!p.isSente) {
                 //for (int[] move : getSemiAvailableSquares(p)) {
-                for (int[] move : orderMoves(p, getSemiAvailableSquares(p))) {
-                    int[] origin = {p.xPos, p.yPos};
-                    Piece killedPiece = getPiece(move[0], move[1]);
+                for (int move : getSemiAvailableSquares(p)) {
+                    int origin = p.pos;
+                    Piece killedPiece = getPiece(move);
                     boolean killedPromoted = false;
-                    p.fakeMove(move[0], move[1]);
+                    p.fakeMove(move);
                     if (killedPiece != null) {
                         killedPromoted = killedPiece.isPromoted;
-                        killedPiece.fakeMove(-3, -3);
+                        killedPiece.fakeMove(-18);
+                        killedPiece.isSente = !killedPiece.isSente;
+                        killedPiece.isDed = true;
                     }
 
                     if (!isChecked(false)) {
-                        float evaluation; //= search(2, Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY, true);
+                        float evaluation;// = -search(3, Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY, true);
                         if (killedPiece != null) {
                             evaluation = -quiscenceSearch(Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY, true);
                         } else {
@@ -1315,14 +1032,15 @@ public class App extends JFrame {
                         if (evaluation < bestEvaluation) {
                             bestEvaluation = evaluation;
                             bestPiece = p;
-                            bestMove[0] = move[0];
-                            bestMove[1] = move[1];
+                            bestMove = move;
                         }    
                     }
-    
-                    p.fakeMove(origin[0], origin[1]);
+
+                    p.fakeMove(origin);
                     if (killedPiece != null) {
-                        killedPiece.fakeMove(move[0], move[1]);
+                        killedPiece.fakeMove(move);
+                        killedPiece.isDed = false;
+                        killedPiece.isSente = !killedPiece.isSente;
                         killedPiece.isPromoted = killedPromoted;
                     }
                 }
@@ -1330,13 +1048,13 @@ public class App extends JFrame {
         }
         System.out.println(bestEvaluation);
         sente = !sente;
-        Piece p = getPiece(bestMove[0], bestMove[1]);
+        Piece p = getPiece(bestMove);
         if (p != null) {
             playSound(captureURL);
             if (p.type.equals("pawn")) {
                 int i = 1;
                 if (p.isSente) i = 0;
-                files[i][p.xPos] = false;    
+                files[i][p.pos%9] = false;    
             }            
             p.kill();
             p.unpromote();
@@ -1345,7 +1063,7 @@ public class App extends JFrame {
         } else {
             playSound(moveURL);
         }
-        bestPiece.move(bestMove[0], bestMove[1]);
+        bestPiece.move(bestMove);
         promote(bestPiece);
         sente = true;
         repaint();
